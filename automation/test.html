@@ -1,0 +1,184 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Plan scheduler tests</title>
+<script type="importmap">{ "imports": { "cloudflare:email": "./email-shim.js" } }</script>
+<pre id="out">running...</pre>
+<script type="module">
+/* Runs plans-worker.js against a fake Cal.com + Stripe. Nothing real is called. */
+import { run, zonedToUtc, localParts, fmt } from "./plans-worker.js";
+
+const WEEKLY = 7208693, BIWEEKLY = 7208694;
+const H = 3600e3, D = 86400e3;
+
+function world() {
+  const w = { bookings: [], stripe: {}, busy: [], calls: [], mails: [], now: 0, seq: 1 };
+  w.kv = new Map();
+  w.env = {
+    CAL_API_KEY: "cal_test", STRIPE_KEY: "rk_test", DRY_RUN: "0",
+    STATE: { get: async (k) => w.kv.get(k) ?? null, put: async (k, v) => { w.kv.set(k, v); } },
+    MAILER: { send: async (m) => { w.mails.push(m.raw); } },
+  };
+  return w;
+}
+function book(w, { email, start, type = WEEKLY, auto = false, status = "accepted", created }) {
+  const b = { uid: "b" + w.seq++, start: new Date(start).toISOString(), status, eventType: { id: type },
+    createdAt: new Date(created ?? w.now - D).toISOString(),
+    attendees: [{ email, name: "Test Member", timeZone: "America/Los_Angeles", phoneNumber: "+18185550100" }],
+    location: "10731 Cantara St, Sun Valley, CA", metadata: auto ? { auto: "1" } : {} };
+  w.bookings.push(b);
+  return b;
+}
+const la = (y, m, d, hh, mm = 0) => zonedToUtc(y, m, d, hh, mm);
+
+function install(w) {
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = new URL(url);
+    const method = opts.method || "GET";
+    const body = opts.body ? JSON.parse(opts.body) : null;
+    const reply = (obj, status = 200) => new Response(JSON.stringify(obj), { status });
+    if (u.host === "api.cal.com") {
+      if (method === "GET" && u.pathname === "/v2/bookings") {
+        const ids = (u.searchParams.get("eventTypeIds") || "").split(",").map(Number);
+        return reply({ status: "success", data: w.bookings.filter((b) => ids.includes(b.eventType.id)), pagination: { hasMore: false, nextCursor: null } });
+      }
+      if (method === "GET" && u.pathname === "/v2/slots") {
+        const from = Date.parse(u.searchParams.get("start")), to = Date.parse(u.searchParams.get("end")) + D;
+        const data = {};
+        for (let day = from - D; day <= to; day += D) {
+          const p = localParts(day + 12 * H);
+          for (let h = 9; h < 16; h++) for (const mm of [0, 30]) {
+            const t = la(p.y, p.m, p.d, h, mm);
+            if (t < from || t > to || t < w.now + 17 * H) continue;
+            if (w.busy.some((b) => Math.abs(b - t) < 90 * 60e3)) continue;
+            if (w.bookings.some((b) => b.status === "accepted" && Math.abs(Date.parse(b.start) - t) < 90 * 60e3)) continue;
+            (data[new Date(t).toISOString().slice(0, 10)] ||= []).push({ start: new Date(t).toISOString() });
+          }
+        }
+        return reply({ status: "success", data });
+      }
+      if (method === "POST" && u.pathname === "/v2/bookings") {
+        w.calls.push(["book", body.start, body.attendee.email, body.metadata.auto, body.location?.address]);
+        const b = book(w, { email: body.attendee.email, start: Date.parse(body.start), type: body.eventTypeId, auto: true, created: w.now });
+        return reply({ status: "success", data: b });
+      }
+      const m = u.pathname.match(/^\/v2\/bookings\/([^/]+)\/cancel$/);
+      if (method === "POST" && m) {
+        const b = w.bookings.find((x) => x.uid === m[1]);
+        b.status = "cancelled";
+        w.calls.push(["cancel", b.start, b.attendees[0].email]);
+        return reply({ status: "success", data: b });
+      }
+    }
+    if (u.host === "api.stripe.com") {
+      if (u.pathname === "/v1/customers/search") {
+        const email = u.searchParams.get("query").match(/'(.+)'/)[1].toLowerCase();
+        return reply({ data: w.stripe[email] ? [{ id: "cus_" + email }] : [] });
+      }
+      if (u.pathname === "/v1/subscriptions") {
+        const email = u.searchParams.get("customer").slice(4);
+        return reply({ data: (w.stripe[email] || []).map((s) => ({ status: s })) });
+      }
+    }
+    return reply({ status: "error", error: "unmocked " + method + " " + url }, 500);
+  };
+}
+
+const results = [];
+function check(name, cond, detail) { results.push((cond ? "PASS  " : "FAIL  ") + name + (cond ? "" : "   -> " + JSON.stringify(detail))); }
+
+// A. new weekly member, active plan: books the next 5 weeks around their own first visit
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.stripe["gor@example.com"] = ["active"];
+  book(w, { email: "gor@example.com", start: la(2026, 10, 6, 10) });
+  const r = await run(w.env, w.now);
+  const booked = w.calls.filter((c) => c[0] === "book").map((c) => fmt(Date.parse(c[1])));
+  check("A books Oct 13, 20, 27, Nov 3 at 10:00 AM", JSON.stringify(booked) === JSON.stringify(["Tue, Oct 13, 10:00 AM", "Tue, Oct 20, 10:00 AM", "Tue, Oct 27, 10:00 AM", "Tue, Nov 3, 10:00 AM"]), booked);
+  check("A copies the address and marks bookings automatic", w.calls.every((c) => c[0] !== "book" || (c[3] === "1" && /Cantara/.test(c[4]))), w.calls);
+  check("A emails the owner once", w.mails.length === 1 && /Booked/.test(w.mails[0]), w.mails);
+
+  // B. same hour again: nothing new, no second email
+  w.calls = []; w.mails = [];
+  await run(w.env, w.now);
+  check("B second run changes nothing and sends no email", w.calls.length === 0 && w.mails.length === 0, { calls: w.calls, mails: w.mails });
+
+  // C. member skips Oct 20: it must never come back
+  w.bookings.find((b) => fmt(Date.parse(b.start)) === "Tue, Oct 20, 10:00 AM").status = "cancelled";
+  w.calls = [];
+  await run(w.env, w.now + 2 * D);
+  check("C a skipped visit is not re-booked", !w.calls.some((c) => c[0] === "book" && fmt(Date.parse(c[1])) === "Tue, Oct 20, 10:00 AM"), w.calls);
+
+  // D. week later: rolls forward by one visit only
+  w.calls = [];
+  await run(w.env, la(2026, 10, 7, 12));
+  const next = w.calls.filter((c) => c[0] === "book").map((c) => fmt(Date.parse(c[1])));
+  check("D a week later adds exactly Nov 10", JSON.stringify(next) === JSON.stringify(["Tue, Nov 10, 10:00 AM"]), next);
+
+  // E. plan cancelled: every future visit is removed, past ones untouched
+  w.stripe["gor@example.com"] = ["canceled"]; w.calls = []; w.mails = [];
+  await run(w.env, la(2026, 10, 7, 12));
+  const cancelled = w.calls.filter((c) => c[0] === "cancel").map((c) => fmt(Date.parse(c[1])));
+  check("E ended plan removes Oct 13, Oct 27, Nov 3, Nov 10", JSON.stringify(cancelled) === JSON.stringify(["Tue, Oct 13, 10:00 AM", "Tue, Oct 27, 10:00 AM", "Tue, Nov 3, 10:00 AM", "Tue, Nov 10, 10:00 AM"]), cancelled);
+  check("E the past visit (Oct 6) is not touched", w.bookings.find((b) => fmt(Date.parse(b.start)) === "Tue, Oct 6, 10:00 AM").status === "accepted", null);
+  check("E emails the owner about the removals", w.mails.length === 1 && /Removed/.test(w.mails[0]), w.mails);
+}
+
+// F. slot already taken by another job: not booked, owner told
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.stripe["amy@example.com"] = ["active"];
+  book(w, { email: "amy@example.com", start: la(2026, 10, 6, 10), type: BIWEEKLY });
+  w.busy.push(la(2026, 10, 20, 10));
+  await run(w.env, w.now);
+  const booked = w.calls.filter((c) => c[0] === "book").map((c) => fmt(Date.parse(c[1])));
+  check("F taken Oct 20 is skipped, Nov 3 still booked", JSON.stringify(booked) === JSON.stringify(["Tue, Nov 3, 10:00 AM"]), booked);
+  check("F owner gets a 'Needs you' email", w.mails.length === 1 && /Needs you/.test(w.mails[0]) && /Oct 20/.test(w.mails[0]), w.mails);
+}
+
+// G. booked the calendar with a different email than they paid with: hands off
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  const own = book(w, { email: "other@example.com", start: la(2026, 10, 6, 10) });
+  await run(w.env, w.now);
+  check("G unknown email: nothing booked or cancelled", w.calls.length === 0 && own.status === "accepted", w.calls);
+  check("G owner is warned", w.mails.length === 1 && /no Stripe plan/.test(w.mails[0]), w.mails);
+}
+
+// H. member picks a new standing time: old automatic visits removed, new series booked
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.stripe["sam@example.com"] = ["active"];
+  book(w, { email: "sam@example.com", start: la(2026, 10, 6, 10), created: w.now - 5 * D });
+  await run(w.env, w.now);
+  book(w, { email: "sam@example.com", start: la(2026, 10, 8, 14), created: w.now + H });
+  w.calls = [];
+  await run(w.env, w.now + 2 * H);
+  const cancelled = w.calls.filter((c) => c[0] === "cancel").length;
+  const booked = w.calls.filter((c) => c[0] === "book").map((c) => fmt(Date.parse(c[1])));
+  check("H old Tuesday automatic visits removed (4)", cancelled === 4, w.calls);
+  check("H new Thursday 2 PM series booked (Oct 15, 22, 29; Oct 8 is their own)", booked.length === 3 && booked.every((x) => x.startsWith("Thu") && x.endsWith("2:00 PM")), booked);
+}
+
+// I. test mode: reports but never calls Cal.com to change anything
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.env.DRY_RUN = "1";
+  w.stripe["dan@example.com"] = ["active"];
+  book(w, { email: "dan@example.com", start: la(2026, 10, 6, 10) });
+  const r = await run(w.env, w.now);
+  check("I dry run changes nothing", w.calls.length === 0 && r.booked.length === 4, { calls: w.calls, booked: r.booked.length });
+  check("I dry run email is labelled TEST MODE", w.mails.length === 1 && /TEST MODE/.test(w.mails[0]), w.mails);
+}
+
+// J. payment failing (past_due): keep booking, don't cancel
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.stripe["pat@example.com"] = ["past_due"];
+  book(w, { email: "pat@example.com", start: la(2026, 10, 6, 10) });
+  await run(w.env, w.now);
+  check("J past_due still counts as a live plan", w.calls.filter((c) => c[0] === "book").length === 4 && !w.calls.some((c) => c[0] === "cancel"), w.calls);
+}
+
+const pass = results.filter((r) => r.startsWith("PASS")).length;
+document.getElementById("out").textContent = `${pass}/${results.length} passed\n\n` + results.join("\n");
+</script>

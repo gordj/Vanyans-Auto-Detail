@@ -1,0 +1,43 @@
+{
+  "_README": [
+    "The only file you edit after setting Square up. Paste the values Square gives",
+    "you, save, then run build.ps1. Leave a value as an empty string and the site",
+    "falls back to the phone and text flow, so a half finished setup never ships a",
+    "dead button.",
+    "",
+    "bookingUrl        Appointments > Online Booking > Channels > Get URL.",
+    "",
+    "embedHtml         Same screen > Get embed code. This is the PUBLIC booking",
+    "                  flow for one off customers. Goes on book.html.",
+    "",
+    "memberEmbedHtml   An ADVANCED WIDGET scoped to the single 'Plan visit'",
+    "                  service. Goes on welcome.html, which only members reach.",
+    "                  Plan visit must have Online Booking Visibility turned OFF",
+    "                  so it never shows on the public booking site.",
+    "",
+    "plans.*           Payments > Subscriptions. One plan per cadence, each with a",
+    "                  checkout link (https://square.link/u/XXXXXXXX). On each link",
+    "                  turn ON 'Redirect to a website after checkout' and point it",
+    "                  at  <your domain>/welcome.html",
+    "",
+    "Paste embed snippets on one line with every double quote escaped as \\\"",
+    "",
+    "2026-09-24: plans.* are now STRIPE Payment Links (subscriptions, redirect to /welcome).",
+    "Booking is moving from Square to Cal.com; bookingUrl/embedHtml are still Square until then.",
+    "Stripe customer portal login: https://billing.stripe.com/p/login/14AfZaaZXeOM1pO6mUdnW00",
+    "cal.link       Cal.com booking link, e.g. 'username' (all services) or 'username/full-detail'. When set, it replaces the Square widget on /book.",
+    "cal.memberLink Cal.com link of the hidden $0 'Plan visit' event, shown on /welcome after a plan purchase."
+  ],
+  "bookingUrl": "https://app.squareup.com/appointments/book/1muswr84xllxi4/LJG5EPAM5E8GF/start",
+  "embedHtml": "<script src='https://square.site/appointments/buyer/widget/1muswr84xllxi4/LJG5EPAM5E8GF.js'></script>",
+  "memberEmbedHtml": "",
+  "plans": {
+    "monthly": "https://buy.stripe.com/14AfZaaZXeOM1pO6mUdnW00",
+    "biweekly": "https://buy.stripe.com/7sY7sEd853649Wk8v2dnW01",
+    "weekly": "https://buy.stripe.com/fZudR2d85220fgE3aIdnW02"
+  },
+  "cal": {
+    "link": "vanyans-auto.detail",
+    "memberLink": "vanyans-auto.detail/plan-{plan}"
+  }
+}

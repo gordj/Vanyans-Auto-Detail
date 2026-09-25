@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vanyans-site",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "site/serve.py"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "plans-test",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8091",
+        "--directory",
+        "automation"
+      ],
+      "port": 8091
+    }
+  ]
+}
