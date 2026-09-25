@@ -500,8 +500,9 @@ footer .wrap{position:relative; display:block}
 .foot-blurb{color:#8FA2B8; font-size:14.5px; line-height:1.65; max-width:34ch}
 .foot-social{display:flex; gap:10px; margin-top:20px}
 .foot-social a{display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px;
-  border-radius:9px; border:1px solid rgba(255,255,255,.14); color:#C8D6E6; transition:border-color .2s, background .2s, color .2s}
-.foot-social a:hover{border-color:var(--accent-hot); background:rgba(59,135,245,.14); color:#fff}
+  border-radius:50%; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:#C8D6E6;
+  transition:border-color .2s, background .2s, color .2s, transform .15s}
+.foot-social a:hover{border-color:var(--accent-hot); background:var(--accent-hot); color:#fff; transform:translateY(-2px)}
 .foot-social svg{width:17px; height:17px}
 .foot-col h4{font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.17em;
   text-transform:uppercase; color:#5E7089; margin:0 0 16px}
@@ -511,6 +512,8 @@ footer .wrap{position:relative; display:block}
 .foot-phone{font-family:var(--display) !important; font-weight:800; font-size:21px !important;
   letter-spacing:-.02em; color:#fff !important; padding-bottom:2px !important}
 .foot-phone:hover{color:var(--accent-hot) !important}
+.foot-hours{color:#66788F !important; font-size:13px !important; margin-top:4px; padding-top:10px !important;
+  border-top:1px solid rgba(255,255,255,.09)}
 .foot-bar{display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:space-between;
   padding:22px 0 30px; border-top:1px solid rgba(255,255,255,.09)}
 .foot-bar span{font-family:var(--mono); font-size:12px; color:#5E7089; letter-spacing:.04em}
@@ -1114,11 +1117,13 @@ footer .wrap{position:relative; display:block}
         <h4>Contact</h4>
         <a class="foot-phone" href="tel:+18186605845">818.660.5845</a>
         <a href="mailto:Vanyansdetailing@gmail.com">Vanyansdetailing@gmail.com</a>
+        <span class="foot-hours">Open every day &middot; 9am&ndash;5pm</span>
       </div>
     </div>
 
     <div class="foot-bar">
       <span>&copy; 2026 Vanyan&rsquo;s Auto Detail</span>
+      <a class="btn btn-primary" href="/book">Schedule a detail</a>
     </div>
   </div>
 </footer>
