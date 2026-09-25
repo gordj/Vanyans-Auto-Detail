@@ -1142,30 +1142,6 @@ footer .wrap{position:relative; display:block}
   </section>
 
 
-  <section class="rule procwrap" id="proc-home">
-    <div class="wrap">
-      <div class="sec-head">
-        <span class="eyebrow">How a full detail runs</span>
-        <h2>Four stages, always in this order.</h2>
-        <p>Skipping one costs you the next. Polish over bonded contamination and you grind it into the
-          clear coat; coat unpolished paint and you lock the swirls in for years.</p>
-      </div>
-      <div class="proc">
-        <div class="proc-nums" id="proc-nums">
-          <div class="proc-num on"><i>01</i><span>Decontaminate</span></div>
-          <div class="proc-num"><i>02</i><span>Correct</span></div>
-          <div class="proc-num"><i>03</i><span>Protect</span></div>
-          <div class="proc-num"><i>04</i><span>Interior</span></div>
-        </div>
-        <div class="proc-body" id="proc-body">
-          <h3>Decontaminate</h3>
-          <p>Foam pre-soak lifts the loose grit before a mitt ever touches paint. Iron remover dissolves
-            embedded brake dust, and a clay bar pulls whatever bonded contamination is left behind.</p>
-          <p class="kit">Foam cannon &middot; pH-neutral soap &middot; two buckets + grit guards &middot; iron remover &middot; clay</p>
-        </div>
-      </div>
-    </div>
-  </section>
 
 </main>
 
@@ -1404,7 +1380,7 @@ footer .wrap{position:relative; display:block}
     {t:'Interior', p:'Hot-water extraction on carpets and cloth, steam on hard surfaces and vents, leather cleaned and conditioned, and glass done last so nothing re-fogs it.', k:'Heated extractor · steam · leather cleaner and conditioner · streak-free glass'}
   ];
   function processScroll(){
-    var wrap = document.getElementById('proc-home');
+    var wrap = document.getElementById('proc-work');
     var nums = document.getElementById('proc-nums');
     var body = document.getElementById('proc-body');
     if(!wrap || !nums || !body || !hasGSAP) return;
@@ -1465,7 +1441,8 @@ footer .wrap{position:relative; display:block}
     /* Order matters: cineScroll pins and inserts a tall spacer, which pushes
        everything below it down. Create it first so later triggers measure the
        real layout. */
-    if(id === 'home'){ cineScroll(); processScroll(); }
+    if(id === 'home'){ cineScroll(); }
+    if(id === 'work'){ processScroll(); }
     /* Belt and braces: any trigger created before a spacer above it still holds
        stale start/end values, so recompute the lot once they all exist. */
     if(hasGSAP){ ScrollTrigger.refresh(); }

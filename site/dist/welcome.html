@@ -1280,7 +1280,7 @@ Cal.ns["member"]("ui", {
     {t:'Interior', p:'Hot-water extraction on carpets and cloth, steam on hard surfaces and vents, leather cleaned and conditioned, and glass done last so nothing re-fogs it.', k:'Heated extractor · steam · leather cleaner and conditioner · streak-free glass'}
   ];
   function processScroll(){
-    var wrap = document.getElementById('proc-home');
+    var wrap = document.getElementById('proc-work');
     var nums = document.getElementById('proc-nums');
     var body = document.getElementById('proc-body');
     if(!wrap || !nums || !body || !hasGSAP) return;
@@ -1341,7 +1341,8 @@ Cal.ns["member"]("ui", {
     /* Order matters: cineScroll pins and inserts a tall spacer, which pushes
        everything below it down. Create it first so later triggers measure the
        real layout. */
-    if(id === 'home'){ cineScroll(); processScroll(); }
+    if(id === 'home'){ cineScroll(); }
+    if(id === 'work'){ processScroll(); }
     /* Belt and braces: any trigger created before a spacer above it still holds
        stale start/end values, so recompute the lot once they all exist. */
     if(hasGSAP){ ScrollTrigger.refresh(); }
