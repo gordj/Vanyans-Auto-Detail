@@ -493,7 +493,8 @@ footer::before{content:""; position:absolute; top:-220px; left:50%; width:900px;
   transform:translateX(-50%); pointer-events:none;
   background:radial-gradient(ellipse at center, rgba(27,109,224,.22), rgba(27,109,224,0) 68%)}
 footer .wrap{position:relative; display:block}
-.foot-top{display:grid; grid-template-columns:1.6fr 1fr 1fr 1.3fr; gap:44px; padding:64px 0 48px}
+.foot-top{display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr 1.1fr; gap:36px; padding:64px 0 48px}
+@media(max-width:1100px){.foot-top{grid-template-columns:1fr 1fr 1fr; gap:36px}}
 @media(max-width:900px){.foot-top{grid-template-columns:1fr 1fr; gap:36px; padding:48px 0 36px}}
 @media(max-width:560px){.foot-top{grid-template-columns:1fr}}
 .foot-brand .brand{margin-bottom:16px}
@@ -1089,17 +1090,24 @@ Cal.ns["member"]("ui", {
         <a href="/services?tab=full">Full Detail</a>
         <a href="/services?tab=ext">Exterior Only</a>
         <a href="/services?tab=int">Interior Only</a>
-        <a href="/#plans">Maintenance plans</a>
-        <a href="/schedule">Schedule a visit</a>
-        <a href="https://billing.stripe.com/p/login/14AfZaaZXeOM1pO6mUdnW00">Manage my plan</a>
+      </div>
+
+      <div class="foot-col">
+        <h4>Members</h4>
+        <a href="/#plans">Maintenance Plan</a>
+        <a href="/schedule">Schedule Maintenance</a>
+        <a href="https://billing.stripe.com/p/login/14AfZaaZXeOM1pO6mUdnW00">Manage Plan</a>
       </div>
 
       <div class="foot-col">
         <h4>Company</h4>
-        <a href="/work">Our work</a>
-        <a href="/area">Service area</a>
+        <a href="/">Home</a>
+        <a href="/services">Services</a>
+        <a href="/work">Work</a>
+        <a href="/schedule">Schedule</a>
         <a href="/about">About</a>
-        <a href="/book">Get a price</a>
+        <a href="/area">Service Area</a>
+        <a href="/book">Get A Price</a>
       </div>
 
       <div class="foot-col">
