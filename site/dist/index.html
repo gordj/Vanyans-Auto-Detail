@@ -327,20 +327,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent); outline:none
 main[data-page="book"] .plans-note,
 main[data-page="welcome"] .plans-note{color:var(--muted)}
 
-.plans-faq{background:linear-gradient(180deg,#16233A,#0B1524); color:#fff; padding:76px 0}
-.plans-faq .eyebrow{color:#6BA6F5}
-.plans-faq h2{color:#fff; font-size:clamp(27px,3.4vw,38px); margin:10px 0 32px}
+.plans-faq{background:var(--ground); color:var(--ink); padding:76px 0}
+.plans-faq h2{font-size:clamp(27px,3.4vw,38px); margin:10px 0 32px}
 .faq{max-width:720px; display:grid; gap:12px}
-.faq details{background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.14); border-radius:12px;
+.faq details{background:var(--surface); border:1px solid var(--line); border-radius:12px;
   padding:18px 22px; transition:border-color .2s ease, background .2s ease}
-.faq details:hover{border-color:rgba(107,166,245,.4)}
+.faq details:hover{border-color:var(--accent-line)}
 .faq summary{cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between;
-  gap:16px; font-size:16.5px; font-weight:600; color:#fff}
+  gap:16px; font-size:16.5px; font-weight:600; color:var(--ink)}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:"+"; font-size:22px; font-weight:400; color:#6BA6F5; flex:none; transition:transform .2s ease}
+.faq summary::after{content:"+"; font-size:22px; font-weight:400; color:var(--accent); flex:none; transition:transform .2s ease}
 .faq details[open] summary::after{transform:rotate(45deg)}
-.faq details[open]{background:rgba(255,255,255,.09)}
-.faq p{margin:14px 0 0; color:#B9C8DA; font-size:15px; line-height:1.6; max-width:60ch}
+.faq details[open]{background:var(--surface-2)}
+.faq p{margin:14px 0 0; color:var(--muted); font-size:15px; line-height:1.6; max-width:60ch}
 
 /* ---------- footer ---------- */
 footer{background:var(--void); color:#93A2B4; padding:46px 0 44px}
