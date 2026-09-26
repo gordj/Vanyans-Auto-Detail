@@ -320,43 +320,28 @@ main[data-page="welcome"] .plans-note{color:var(--muted)}
 .faq details[open]{background:var(--surface-2)}
 .faq p{margin:14px 0 0; color:var(--muted); font-size:15px; line-height:1.6; max-width:60ch}
 
-/* ---------- home: photo slideshow ---------- */
+/* ---------- home: photo reel ---------- */
 .gallery{background:var(--ground); padding:46px 0 0}
 .gallery-head{margin-bottom:36px; text-align:center}
 .gallery-head h2{font-size:clamp(27px,3.4vw,38px); margin:10px auto 0; max-width:26ch}
 
-.gallery-stage{position:relative; height:min(78vw,680px); min-height:280px; overflow:hidden}
-.gallery-track{position:relative; width:100%; height:100%}
-.gallery-slide{position:absolute; inset:0; margin:0; opacity:0; transition:opacity 1.1s ease}
-.gallery-slide.on{opacity:1; z-index:1}
-.gallery-slide img{position:absolute; top:50%; left:50%; width:120%; height:120%;
-  object-fit:cover; object-position:50% 50%; transform:translate(-50%,-50%) scale(.8333); will-change:transform}
-.gallery-slide.on img{animation:gallery-kb 6.3s ease-out forwards}
-@keyframes gallery-kb{from{transform:translate(-50%,-50%) scale(.8333)} to{transform:translate(-50%,-50%) scale(1)}}
-
-.gallery-veil{position:absolute; inset:0; pointer-events:none; z-index:2;
-  background:linear-gradient(180deg, rgba(8,14,24,0) 55%, rgba(8,14,24,.55) 85%, rgba(8,14,24,.94) 100%)}
-
-.gallery-arrow{position:absolute; top:50%; transform:translateY(-50%); z-index:3;
-  width:44px; height:44px; border-radius:999px; border:1px solid rgba(255,255,255,.42);
-  background:rgba(8,14,24,.38); backdrop-filter:blur(8px); color:#fff; font-size:22px;
-  line-height:1; display:flex; align-items:center; justify-content:center;
-  cursor:pointer; transition:background .15s, border-color .15s}
-.gallery-arrow:hover{background:rgba(8,14,24,.6); border-color:#fff}
-.gallery-prev{left:18px}
-.gallery-next{right:18px}
-@media(max-width:700px){.gallery-arrow{display:none}}
-
-.gallery-dots{position:absolute; left:0; right:0; bottom:20px; z-index:3;
-  display:flex; justify-content:center; gap:9px}
-.gallery-dot{width:9px; height:9px; padding:0; border:1px solid rgba(255,255,255,.6);
-  border-radius:999px; background:rgba(255,255,255,.28); cursor:pointer;
-  transition:background .15s, width .15s, border-radius .15s}
-.gallery-dot.on{background:#fff; width:22px; border-radius:5px}
-.gallery-dot:focus-visible, .gallery-arrow:focus-visible{outline:2px solid #7FB3FF; outline-offset:2px}
+.reel{position:relative; background:var(--void); overflow:hidden; padding:32px 0 48px;
+  -webkit-mask-image:linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image:linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)}
+.reel-track{display:flex; gap:16px; width:max-content; animation:reel-scroll 56s linear infinite}
+.reel:hover .reel-track{animation-play-state:paused}
+.reel-card{position:relative; flex:none; margin:0; width:184px; aspect-ratio:2/3; border-radius:14px;
+  overflow:hidden; box-shadow:0 16px 34px -14px rgba(0,0,0,.6); transition:transform .3s ease}
+.reel-card:hover{transform:translateY(-6px) scale(1.03)}
+.reel-card img{width:100%; height:100%; object-fit:cover; display:block}
+@keyframes reel-scroll{from{transform:translateX(0)} to{transform:translateX(-50%)}}
+@media(max-width:700px){.reel-card{width:132px}}
 @media(prefers-reduced-motion:reduce){
-  .gallery-slide{transition:none}
-  .gallery-slide.on img{animation:none}
+  .reel{overflow-x:auto; -webkit-mask-image:none; mask-image:none}
+  .reel-track{animation:none; scroll-snap-type:x proximity}
+  .reel-dup{display:none}
+  .reel-card{scroll-snap-align:start}
+  .reel-card:hover{transform:none}
 }
 
 /* ---------- footer ---------- */
@@ -1210,74 +1195,66 @@ footer .wrap{position:relative; display:block}
   <section class="gallery">
     <div class="wrap gallery-head">
       <span class="eyebrow">Recent work, unfiltered</span>
-      <h2>Every photo here is a car we actually detailed.</h2>
+      <h2>Nothing staged. Nothing borrowed.</h2>
     </div>
-    <div class="gallery-stage" role="region" aria-roledescription="carousel"
-         aria-label="Photos from real Vanyan&rsquo;s Auto Detail jobs">
-      <div class="gallery-track">
-        <figure class="gallery-slide on">
+    <div class="reel" aria-label="Photos from real Vanyan&rsquo;s Auto Detail jobs">
+      <div class="reel-track">
+        <figure class="reel-card">
           <img src="img/gallery/job-01.jpg" loading="eager"
                alt="Foam cannon covering a white Corvette C8 in thick pre-wash foam under a carport canopy, technician spraying from the side.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-02.jpg" loading="lazy"
                alt="A white Corvette C8 completely coated in pre-wash foam, front three-quarter view, parked in a driveway carport.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-03.jpg" loading="lazy"
                alt="Technician in a Vanyan&rsquo;s shirt rinsing foam off a dark Corvette with a pressure washer, security van parked behind.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-04.jpg" loading="lazy"
                alt="Technician with a Vanyan&rsquo;s Mobile Detailing logo on his shirt rinsing foam off the hood and windshield of a black Corvette C8.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-05.jpg" loading="lazy"
                alt="Technician walking alongside a black Corvette C8, rinsing the hood clean with a pressure washer wand.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-06.jpg" loading="lazy"
                alt="Technician in a Vanyan&rsquo;s Mobile Detailing shirt rinsing the hood of a black Corvette C8 under the wash canopy.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-07.jpg" loading="lazy"
                alt="Close-up of a black Corvette wheel being hand-scrubbed with a sponge, suds covering the rim and red brake caliper.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-08.jpg" loading="lazy"
                alt="Technician drying the open front trunk of a black Corvette C8 with a microfiber towel.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-09.jpg" loading="lazy"
                alt="Two technicians finishing a black Corvette C8, one drying the hood with a yellow microfiber towel, the other working near the open trunk.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-10.jpg" loading="lazy"
                alt="A finished black Corvette C8, clean and glossy, parked under the wash canopy after detailing.">
         </figure>
-        <figure class="gallery-slide">
+        <figure class="reel-card">
           <img src="img/gallery/job-11.jpg" loading="lazy"
                alt="Technician wiping down the black leather seat and door jamb inside a Corvette&rsquo;s interior.">
         </figure>
-      </div>
-
-      <div class="gallery-veil" aria-hidden="true"></div>
-
-      <button type="button" class="gallery-arrow gallery-prev" aria-label="Previous photo">&lsaquo;</button>
-      <button type="button" class="gallery-arrow gallery-next" aria-label="Next photo">&rsaquo;</button>
-
-      <div class="gallery-dots" role="group" aria-label="Choose a photo">
-        <button type="button" class="gallery-dot on" aria-label="Photo 1 of 11" aria-current="true"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 2 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 3 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 4 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 5 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 6 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 7 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 8 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 9 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 10 of 11" aria-current="false"></button>
-        <button type="button" class="gallery-dot" aria-label="Photo 11 of 11" aria-current="false"></button>
+        <!-- duplicate set, hidden from assistive tech, so the marquee loops seamlessly -->
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-01.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-02.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-03.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-04.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-05.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-06.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-07.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-08.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-09.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-10.jpg" loading="lazy" alt=""></figure>
+        <figure class="reel-card reel-dup" aria-hidden="true"><img src="img/gallery/job-11.jpg" loading="lazy" alt=""></figure>
       </div>
     </div>
   </section>
@@ -1975,72 +1952,6 @@ footer .wrap{position:relative; display:block}
     });
   }
 
-  /* ---------- home: photo slideshow ---------- */
-  var gallery = { timer:null, bound:false, cur:0, slides:[], dots:[], stage:null, INTERVAL:5500 };
-
-  function galleryShow(i){
-    var s = gallery.slides, d = gallery.dots;
-    if(!s.length) return;
-    i = (i + s.length) % s.length;
-    s[gallery.cur].classList.remove('on');
-    if(d[gallery.cur]){ d[gallery.cur].classList.remove('on'); d[gallery.cur].setAttribute('aria-current','false'); }
-    gallery.cur = i;
-    s[i].classList.add('on');
-    if(d[i]){ d[i].classList.add('on'); d[i].setAttribute('aria-current','true'); }
-    if(!reduce){
-      /* re-trigger the CSS zoom animation on the newly active slide: swapping
-         the class alone won't replay a fill-forwards animation. */
-      var img = s[i].querySelector('img');
-      img.style.animation = 'none';
-      void img.offsetWidth;
-      img.style.animation = '';
-    }
-  }
-  function galleryStop(){ if(gallery.timer){ clearInterval(gallery.timer); gallery.timer = null; } }
-  function galleryStart(){
-    galleryStop();
-    if(reduce) return;
-    gallery.timer = setInterval(function(){ galleryShow(gallery.cur + 1); }, gallery.INTERVAL);
-  }
-  function homeGallery(){
-    var root = document.querySelector('.gallery');
-    if(!root) return;
-    galleryStop();
-    gallery.slides = Array.prototype.slice.call(root.querySelectorAll('.gallery-slide'));
-    gallery.dots   = Array.prototype.slice.call(root.querySelectorAll('.gallery-dot'));
-    gallery.stage  = root.querySelector('.gallery-stage');
-    if(!gallery.slides.length) return;
-    var found = 0;
-    for(var k=0; k<gallery.slides.length; k++){ if(gallery.slides[k].classList.contains('on')){ found = k; break; } }
-    gallery.cur = found;
-    if(reduce){ root.classList.add('reduced'); galleryShow(gallery.cur); }
-    else { galleryShow(gallery.cur); galleryStart(); }
-    if(!gallery.bound){
-      gallery.bound = true;
-      var prevBtn = root.querySelector('.gallery-prev');
-      var nextBtn = root.querySelector('.gallery-next');
-      if(prevBtn) prevBtn.addEventListener('click', function(){ galleryShow(gallery.cur - 1); galleryStart(); });
-      if(nextBtn) nextBtn.addEventListener('click', function(){ galleryShow(gallery.cur + 1); galleryStart(); });
-      root.addEventListener('click', function(e){
-        var dot = e.target.closest ? e.target.closest('.gallery-dot') : null;
-        if(!dot) return;
-        var i = gallery.dots.indexOf(dot);
-        if(i >= 0){ galleryShow(i); galleryStart(); }
-      });
-      if(gallery.stage){
-        gallery.stage.addEventListener('mouseenter', galleryStop);
-        gallery.stage.addEventListener('mouseleave', galleryStart);
-        gallery.stage.addEventListener('focusin', galleryStop);
-        gallery.stage.addEventListener('focusout', function(e){
-          if(!gallery.stage.contains(e.relatedTarget)) galleryStart();
-        });
-      }
-      document.addEventListener('visibilitychange', function(){
-        if(document.hidden) galleryStop(); else galleryStart();
-      });
-    }
-  }
-
   var built = {};
   function buildScroll(id){
     if(hasGSAP){ ScrollTrigger.getAll().forEach(function(t){ t.kill(true); }); }
@@ -2050,7 +1961,7 @@ footer .wrap{position:relative; display:block}
     /* Order matters: cineScroll pins and inserts a tall spacer, which pushes
        everything below it down. Create it first so later triggers measure the
        real layout. */
-    if(id === 'home'){ cineScroll(); homeGallery(); }
+    if(id === 'home'){ cineScroll(); }
     if(id === 'work'){ processScroll(); }
     /* Belt and braces: any trigger created before a spacer above it still holds
        stale start/end values, so recompute the lot once they all exist. */
