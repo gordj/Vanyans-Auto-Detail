@@ -235,23 +235,6 @@ tr.feature td{background:var(--accent-dim)}
 .unlock-price li:last-child{border-bottom:none}
 
 
-/* ---------- pinned process ---------- */
-.procwrap{position:relative}
-.proc{display:grid; grid-template-columns:.9fr 1.1fr; gap:52px; align-items:center; min-height:60vh}
-@media(max-width:900px){.proc{grid-template-columns:1fr; gap:28px; min-height:0}}
-.proc-nums{display:flex; flex-direction:column; gap:6px}
-.proc-num{display:flex; gap:16px; align-items:baseline; padding:14px 18px; border-radius:9px; border:1px solid transparent; transition:background .3s, border-color .3s}
-.proc-num.on{background:var(--surface); border-color:var(--line-2)}
-.proc-num i{font-family:var(--mono); font-style:normal; font-size:12px; font-weight:600; color:var(--muted); letter-spacing:.1em; transition:color .3s}
-.proc-num.on i{color:var(--accent)}
-.proc-num span{font-family:var(--display); font-weight:700; font-size:19px; letter-spacing:-.025em; color:var(--muted); transition:color .3s}
-.proc-num.on span{color:var(--ink)}
-.proc-body{border-left:2px solid var(--accent); padding-left:26px}
-@media(max-width:900px){.proc-body{padding-left:20px}}
-.proc-body h3{font-size:clamp(24px,3vw,32px); margin-bottom:12px}
-.proc-body p{color:var(--ink-2); font-size:16.5px; max-width:52ch}
-.proc-body .kit{font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:16px; letter-spacing:.03em}
-
 /* ---------- work gallery ---------- */
 @media(max-width:900px){.gal{flex-direction:column} .gal figure{width:100%}}
 
@@ -1337,46 +1320,6 @@ footer .wrap{position:relative; display:block}
     });
   }
 
-  /* ---------- process stages ---------- */
-  var STAGES = [
-    {t:'Decontaminate', p:'Foam pre-soak lifts the loose grit before a mitt ever touches paint. Iron remover dissolves embedded brake dust, and a clay bar pulls whatever bonded contamination is left behind.', k:'Foam cannon · pH-neutral soap · two buckets + grit guards · iron remover · clay'},
-    {t:'Correct', p:'A test spot sets the pad and the compound, then a dual-action polisher works panel by panel. This is the stage that removes swirls and brings the gloss back.', k:'Dual-action polisher · cutting and finishing pads · paint depth check · test spot'},
-    {t:'Protect', p:'Panel wipe strips the polishing oils so nothing hides under the protection. Sealant or ceramic then goes onto clean, corrected paint. That is the only way it bonds and lasts.', k:'Panel wipe · sealant or ceramic coating · glass and wheels included'},
-    {t:'Interior', p:'Hot-water extraction on carpets and cloth, steam on hard surfaces and vents, leather cleaned and conditioned, and glass done last so nothing re-fogs it.', k:'Heated extractor · steam · leather cleaner and conditioner · streak-free glass'}
-  ];
-  function processScroll(){
-    var wrap = document.getElementById('proc-work');
-    var nums = document.getElementById('proc-nums');
-    var body = document.getElementById('proc-body');
-    if(!wrap || !nums || !body || !hasGSAP) return;
-    var items = Array.prototype.slice.call(nums.children);
-    var cur = -1;
-    function show(i){
-      if(i === cur) return; cur = i;
-      var s = STAGES[i];
-      body.innerHTML = '<h3></h3><p></p><p class="kit"></p>';
-      body.querySelector('h3').textContent = s.t;
-      body.querySelector('p').textContent = s.p;
-      body.querySelector('.kit').textContent = s.k;
-      items.forEach(function(el,n){ el.classList.toggle('on', n === i); });
-      if(!reduce){ gsap.fromTo(body, {y:14}, {y:0, duration:.4, ease:'power2.out'}); }
-    }
-    show(0);
-    items.forEach(function(el,i){ el.style.cursor='pointer'; el.addEventListener('click', function(){ show(i); }); });
-
-    /* Reduced motion must not get a pinned, scroll jacked section. The stages
-       stay clickable, they just do not advance on scroll. */
-    if(reduce || window.innerWidth < 900) return;
-    ScrollTrigger.create({
-      trigger: wrap, start: 'top top', end: '+=1800', pin: true, scrub: .4,
-      onUpdate: function(self){
-        var i = Math.min(STAGES.length-1, Math.floor(self.progress * STAGES.length));
-        show(i);
-      }
-    });
-  }
-
-
   /* ---------- parallax + reveals ---------- */
   function parallax(scope){
     if(reduce || !hasGSAP) return;
@@ -1407,7 +1350,6 @@ footer .wrap{position:relative; display:block}
        everything below it down. Create it first so later triggers measure the
        real layout. */
     if(id === 'home'){ cineScroll(); }
-    if(id === 'work'){ processScroll(); }
     /* Belt and braces: any trigger created before a spacer above it still holds
        stale start/end values, so recompute the lot once they all exist. */
     if(hasGSAP){ ScrollTrigger.refresh(); }

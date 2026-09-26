@@ -235,23 +235,6 @@ tr.feature td{background:var(--accent-dim)}
 .unlock-price li:last-child{border-bottom:none}
 
 
-/* ---------- pinned process ---------- */
-.procwrap{position:relative}
-.proc{display:grid; grid-template-columns:.9fr 1.1fr; gap:52px; align-items:center; min-height:60vh}
-@media(max-width:900px){.proc{grid-template-columns:1fr; gap:28px; min-height:0}}
-.proc-nums{display:flex; flex-direction:column; gap:6px}
-.proc-num{display:flex; gap:16px; align-items:baseline; padding:14px 18px; border-radius:9px; border:1px solid transparent; transition:background .3s, border-color .3s}
-.proc-num.on{background:var(--surface); border-color:var(--line-2)}
-.proc-num i{font-family:var(--mono); font-style:normal; font-size:12px; font-weight:600; color:var(--muted); letter-spacing:.1em; transition:color .3s}
-.proc-num.on i{color:var(--accent)}
-.proc-num span{font-family:var(--display); font-weight:700; font-size:19px; letter-spacing:-.025em; color:var(--muted); transition:color .3s}
-.proc-num.on span{color:var(--ink)}
-.proc-body{border-left:2px solid var(--accent); padding-left:26px}
-@media(max-width:900px){.proc-body{padding-left:20px}}
-.proc-body h3{font-size:clamp(24px,3vw,32px); margin-bottom:12px}
-.proc-body p{color:var(--ink-2); font-size:16.5px; max-width:52ch}
-.proc-body .kit{font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:16px; letter-spacing:.03em}
-
 /* ---------- work gallery ---------- */
 @media(max-width:900px){.gal{flex-direction:column} .gal figure{width:100%}}
 
@@ -1062,92 +1045,89 @@ footer .wrap{position:relative; display:block}
             <p>Foam lifts the grit before anything touches the paint.</p>
           </div>
           <div class="step-pics">
-            <figure><img src="img/work/01-soak-a.jpg?v=9ac68bb4" alt="Foam cannon over the Corvette" loading="lazy"></figure>
-            <figure><img src="img/work/01-soak-b.jpg?v=37123ee0" alt="Foam covering the front" loading="lazy"></figure>
+            <figure><img src="img/process/step-01a.jpg?v=32ff98e8" alt="Foam cannon coating the Corvette in pre-wash foam" loading="lazy"></figure>
+            <figure><img src="img/process/step-01b.jpg?v=5b5945c5" alt="Foam cannon covering the side of the car" loading="lazy"></figure>
           </div>
         </article>
         <article class="step">
           <div class="step-text">
             <span class="step-n">02</span>
-            <h3>Hand wash</h3>
-            <p>Soft mitt, one panel at a time.</p>
+            <h3>Rinse</h3>
+            <p>High-pressure rinse removes loosened dirt and foam residue.</p>
           </div>
           <div class="step-pics">
-            <figure><img src="img/work/02-wash-a.jpg?v=15fdf977" alt="Hand washing the front" loading="lazy"></figure>
-            <figure><img src="img/work/02-wash-b.jpg?v=c564f6b9" alt="Washing along the fender" loading="lazy"></figure>
+            <figure><img src="img/process/step-02a.jpg?v=1c6f36f8" alt="Rinsing foam off the hood with a pressure washer" loading="lazy"></figure>
+            <figure><img src="img/process/step-02b.jpg?v=e1f5e602" alt="Rinsing the front of the car" loading="lazy"></figure>
           </div>
         </article>
         <article class="step">
           <div class="step-text">
             <span class="step-n">03</span>
-            <h3>Wheels</h3>
-            <p>Faces, barrels and calipers, by hand.</p>
+            <h3>Tire &amp; Wheel Detail</h3>
+            <p>Every tire is brushed clean and finished with black shine for a deep, lasting look.</p>
           </div>
           <div class="step-pics">
-            <figure><img src="img/work/03-wheels-a.jpg?v=29788583" alt="Scrubbing a wheel" loading="lazy"></figure>
-            <figure><img src="img/work/03-wheels-b.jpg?v=1234c19f" alt="Brushing inside the wheel" loading="lazy"></figure>
+            <figure><img src="img/process/step-03a.jpg?v=f18b7a2e" alt="Scrubbing a wheel and brake caliper by hand" loading="lazy"></figure>
+            <figure><img src="img/process/step-03b.jpg?v=4d61ae05" alt="Close-up of a soapy wheel being detailed" loading="lazy"></figure>
           </div>
         </article>
         <article class="step">
           <div class="step-text">
             <span class="step-n">04</span>
-            <h3>Rinse</h3>
-            <p>Top to bottom until the water runs clear.</p>
+            <h3>Paint Enhancement Soak</h3>
+            <p>A second foam layer boosts gloss and prepares the surface for hand washing.</p>
           </div>
           <div class="step-pics">
-            <figure><img src="img/work/04-rinse-a.jpg?v=c6c7d03f" alt="Rinsing the roof" loading="lazy"></figure>
-            <figure><img src="img/work/04-rinse-b.jpg?v=ffaa945b" alt="Rinsing the side" loading="lazy"></figure>
+            <figure><img src="img/process/step-04a.jpg?v=84591014" alt="A second foam layer coating the car for paint enhancement" loading="lazy"></figure>
+            <figure><img src="img/process/step-04b.jpg?v=f4688135" alt="Foam sitting on the paint before hand washing" loading="lazy"></figure>
           </div>
         </article>
         <article class="step">
           <div class="step-text">
             <span class="step-n">05</span>
-            <h3>Dry</h3>
-            <p>Plush towels. Frunk and jambs wiped down.</p>
+            <h3>Hand Wash</h3>
+            <p>Gentle two-bucket hand wash for a swirl-free, showroom finish.</p>
           </div>
           <div class="step-pics">
-            <figure><img src="img/work/05-dry-a.jpg?v=1035a684" alt="Drying the hood" loading="lazy"></figure>
-            <figure><img src="img/work/05-dry-b.jpg?v=94f8a853" alt="Wiping down the frunk" loading="lazy"></figure>
+            <figure><img src="img/process/step-05a.jpg?v=09bf95d3" alt="Mitt working suds into the hood by hand" loading="lazy"></figure>
+            <figure><img src="img/process/step-05b.jpg?v=821dda80" alt="Hand washing the front of the car with a mitt" loading="lazy"></figure>
           </div>
         </article>
         <article class="step">
           <div class="step-text">
             <span class="step-n">06</span>
-            <h3>Interior</h3>
-            <p>Vacuumed and wiped, seats to dash.</p>
+            <h3>Protective Wax Spray</h3>
+            <p>A final wax layer seals the paint and adds hydrophobic protection.</p>
           </div>
           <div class="step-pics">
-            <figure><img src="img/work/06-interior-a.jpg?v=431449fc" alt="Vacuuming the cabin" loading="lazy"></figure>
-            <figure><img src="img/work/06-interior-b.jpg?v=052ee79f" alt="Wiping the door and seat" loading="lazy"></figure>
+            <figure><img src="img/process/step-06a.jpg?v=2809426e" alt="Wiping down the hood after the final protective layer" loading="lazy"></figure>
+            <figure><img src="img/process/step-06b.jpg?v=b52b7af5" alt="Drying the trunk lid after wax" loading="lazy"></figure>
+          </div>
+        </article>
+        <article class="step">
+          <div class="step-text">
+            <span class="step-n">07</span>
+            <h3>Final Rinse &amp; Dry</h3>
+            <p>Spot-free rinse and careful drying for a perfect finish.</p>
+          </div>
+          <div class="step-pics">
+            <figure><img src="img/process/step-07a.jpg?v=d417930c" alt="Drying the open front trunk with a microfiber towel" loading="lazy"></figure>
+            <figure><img src="img/process/step-07b.jpg?v=08d2c59f" alt="Two technicians drying the hood with a yellow towel" loading="lazy"></figure>
+          </div>
+        </article>
+        <article class="step">
+          <div class="step-text">
+            <span class="step-n">08</span>
+            <h3>Interior Refresh</h3>
+            <p>Full vacuum (including under seats), all surfaces wiped, and windows cleaned inside and out.</p>
+          </div>
+          <div class="step-pics">
+            <figure><img src="img/process/step-08a.jpg?v=f0711148" alt="Wiping down the leather seat and door jamb" loading="lazy"></figure>
+            <figure><img src="img/process/step-08b.jpg?v=4cddfc1d" alt="Cleaning the passenger seat with a spray bottle" loading="lazy"></figure>
           </div>
         </article>
       </div>
 
-    </div>
-  </section>
-
-  <section class="rule procwrap" id="proc-work">
-    <div class="wrap">
-      <div class="sec-head">
-        <span class="eyebrow">How a full detail runs</span>
-        <h2>Four stages, always in this order.</h2>
-        <p>Skipping one costs you the next. Polish over bonded contamination and you grind it into the
-          clear coat; coat unpolished paint and you lock the swirls in for years.</p>
-      </div>
-      <div class="proc">
-        <div class="proc-nums" id="proc-nums">
-          <div class="proc-num on"><i>01</i><span>Decontaminate</span></div>
-          <div class="proc-num"><i>02</i><span>Correct</span></div>
-          <div class="proc-num"><i>03</i><span>Protect</span></div>
-          <div class="proc-num"><i>04</i><span>Interior</span></div>
-        </div>
-        <div class="proc-body" id="proc-body">
-          <h3>Decontaminate</h3>
-          <p>Foam pre-soak lifts the loose grit before a mitt ever touches paint. Iron remover dissolves
-            embedded brake dust, and a clay bar pulls whatever bonded contamination is left behind.</p>
-          <p class="kit">Foam cannon &middot; pH-neutral soap &middot; two buckets + grit guards &middot; iron remover &middot; clay</p>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -1383,46 +1363,6 @@ footer .wrap{position:relative; display:block}
     });
   }
 
-  /* ---------- process stages ---------- */
-  var STAGES = [
-    {t:'Decontaminate', p:'Foam pre-soak lifts the loose grit before a mitt ever touches paint. Iron remover dissolves embedded brake dust, and a clay bar pulls whatever bonded contamination is left behind.', k:'Foam cannon · pH-neutral soap · two buckets + grit guards · iron remover · clay'},
-    {t:'Correct', p:'A test spot sets the pad and the compound, then a dual-action polisher works panel by panel. This is the stage that removes swirls and brings the gloss back.', k:'Dual-action polisher · cutting and finishing pads · paint depth check · test spot'},
-    {t:'Protect', p:'Panel wipe strips the polishing oils so nothing hides under the protection. Sealant or ceramic then goes onto clean, corrected paint. That is the only way it bonds and lasts.', k:'Panel wipe · sealant or ceramic coating · glass and wheels included'},
-    {t:'Interior', p:'Hot-water extraction on carpets and cloth, steam on hard surfaces and vents, leather cleaned and conditioned, and glass done last so nothing re-fogs it.', k:'Heated extractor · steam · leather cleaner and conditioner · streak-free glass'}
-  ];
-  function processScroll(){
-    var wrap = document.getElementById('proc-work');
-    var nums = document.getElementById('proc-nums');
-    var body = document.getElementById('proc-body');
-    if(!wrap || !nums || !body || !hasGSAP) return;
-    var items = Array.prototype.slice.call(nums.children);
-    var cur = -1;
-    function show(i){
-      if(i === cur) return; cur = i;
-      var s = STAGES[i];
-      body.innerHTML = '<h3></h3><p></p><p class="kit"></p>';
-      body.querySelector('h3').textContent = s.t;
-      body.querySelector('p').textContent = s.p;
-      body.querySelector('.kit').textContent = s.k;
-      items.forEach(function(el,n){ el.classList.toggle('on', n === i); });
-      if(!reduce){ gsap.fromTo(body, {y:14}, {y:0, duration:.4, ease:'power2.out'}); }
-    }
-    show(0);
-    items.forEach(function(el,i){ el.style.cursor='pointer'; el.addEventListener('click', function(){ show(i); }); });
-
-    /* Reduced motion must not get a pinned, scroll jacked section. The stages
-       stay clickable, they just do not advance on scroll. */
-    if(reduce || window.innerWidth < 900) return;
-    ScrollTrigger.create({
-      trigger: wrap, start: 'top top', end: '+=1800', pin: true, scrub: .4,
-      onUpdate: function(self){
-        var i = Math.min(STAGES.length-1, Math.floor(self.progress * STAGES.length));
-        show(i);
-      }
-    });
-  }
-
-
   /* ---------- parallax + reveals ---------- */
   function parallax(scope){
     if(reduce || !hasGSAP) return;
@@ -1453,7 +1393,6 @@ footer .wrap{position:relative; display:block}
        everything below it down. Create it first so later triggers measure the
        real layout. */
     if(id === 'home'){ cineScroll(); }
-    if(id === 'work'){ processScroll(); }
     /* Belt and braces: any trigger created before a spacer above it still holds
        stale start/end values, so recompute the lot once they all exist. */
     if(hasGSAP){ ScrollTrigger.refresh(); }
