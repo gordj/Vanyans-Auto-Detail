@@ -602,15 +602,22 @@ export function candidateStarts(now) {
   return out;
 }
 
+const FREEBUSY_CHUNK_MS = 55 * DAY; // Google rejects a single query over ~3 months ("timeRangeTooLong")
+
 async function freeBusy(env, fromMs, toMs) {
-  const j = await gcal(env, "/freeBusy", {
-    method: "POST",
-    body: { timeMin: new Date(fromMs).toISOString(), timeMax: new Date(toMs).toISOString(), timeZone: TZ, items: [{ id: calendarId(env) }] },
-  });
-  const c = Object.values(j.calendars || {})[0];
-  if (c?.errors?.length) throw new Error("Google FreeBusy error: " + JSON.stringify(c.errors).slice(0, 200));
-  // busy time is padded with the travel buffer so visits never sit back to back
-  return (c?.busy || []).map((b) => ({ s: Date.parse(b.start), e: Date.parse(b.end) + BUFFER_MS }));
+  const busy = [];
+  for (let chunkStart = fromMs; chunkStart < toMs; chunkStart += FREEBUSY_CHUNK_MS) {
+    const chunkEnd = Math.min(chunkStart + FREEBUSY_CHUNK_MS, toMs);
+    const j = await gcal(env, "/freeBusy", {
+      method: "POST",
+      body: { timeMin: new Date(chunkStart).toISOString(), timeMax: new Date(chunkEnd).toISOString(), timeZone: TZ, items: [{ id: calendarId(env) }] },
+    });
+    const c = Object.values(j.calendars || {})[0];
+    if (c?.errors?.length) throw new Error("Google FreeBusy error: " + JSON.stringify(c.errors).slice(0, 200));
+    // busy time is padded with the travel buffer so visits never sit back to back
+    for (const b of c?.busy || []) busy.push({ s: Date.parse(b.start), e: Date.parse(b.end) + BUFFER_MS });
+  }
+  return busy;
 }
 
 /** First-visit times that stay free for the next 12 weeks of that plan's schedule. */

@@ -74,8 +74,12 @@ function install(w) {
       const body = opts.body ? JSON.parse(opts.body) : null;
       if (path === "/freeBusy") {
         const from = Date.parse(body.timeMin), to = Date.parse(body.timeMax);
+        w.freeBusyCalls = (w.freeBusyCalls || 0) + 1;
+        w.freeBusyRanges = w.freeBusyRanges || [];
+        w.freeBusyRanges.push([from, to]);
+        if (to - from > 56 * D) return reply({ error: { errors: [{ domain: "calendar", reason: "timeRangeTooLong", message: "The requested time range is too long." }] } }, 400);
         const busy = w.g.blind ? [] : live(w).flatMap((e) => instances(w, e, from, to)).map((x) => ({ start: new Date(x.s).toISOString(), end: new Date(x.e).toISOString() }));
-        for (const b of w.g.extraBusy) busy.push({ start: new Date(b[0]).toISOString(), end: new Date(b[1]).toISOString() });
+        for (const b of w.g.extraBusy) if (b[0] < to && b[1] > from) busy.push({ start: new Date(b[0]).toISOString(), end: new Date(b[1]).toISOString() });
         return reply({ calendars: { [body.items[0].id]: { busy } } });
       }
       const m = path.match(/^\/calendars\/[^/]+\/events(?:\/([^/]+))?$/);
@@ -151,6 +155,11 @@ const input = (o = {}) => ({ plan: "weekly", start: new Date(la(2026, 10, 1, 9))
   check("P offers 21 days x 14 starts", s.length === 294, s.length);
   check("P first offer is Thu Oct 1, 9:00 AM (17 h notice)", fmt(s[0]) === "Thu, Oct 1, 9:00 AM", fmt(s[0]));
   check("P last start of a day is 3:30 PM", fmt(s[13]) === "Thu, Oct 1, 3:30 PM", fmt(s[13]));
+  // the fake server rejects any single freeBusy call over 56 days, just like real Google's "timeRangeTooLong";
+  // freeStarts covers ~107 days (offer window + 12-week coverage check), so this only passes if it is chunked
+  check("P freeBusy is split into more than one call (Google rejects a single 107-day query)", w.freeBusyCalls >= 2, w.freeBusyCalls);
+  check("P no single freeBusy chunk exceeds 56 days", w.freeBusyRanges.every(([a, b]) => b - a <= 56 * D), w.freeBusyRanges.map(([a, b]) => Math.round((b - a) / D)));
+  check("P the chunks cover the full range with no gap", w.freeBusyRanges[0][0] === NOW && w.freeBusyRanges[w.freeBusyRanges.length - 1][1] >= NOW + 106 * D, w.freeBusyRanges);
 }
 
 // Q. a never-ending biweekly Friday 9:00 series blocks a weekly Friday 9:00 but not a biweekly on the other weeks

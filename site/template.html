@@ -279,15 +279,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent); outline:none
   background:var(--surface); overflow:hidden}
 
 /* ---------- plan reservation: pick a time, then check out ---------- */
-.rsv{margin-top:26px; display:grid; gap:22px; max-width:760px}
+.rsv{margin-top:26px; display:grid; gap:22px; max-width:820px}
 .rsv-card{border:1px solid var(--line-2); border-radius:14px; background:var(--surface); padding:24px}
 .rsv-card h3{font-size:19px; margin:0 0 16px}
-.rsv-days{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px}
-.rsv-day,.rsv-time{font-family:var(--body); font-size:14.5px; font-weight:600; color:var(--ink-2); background:var(--surface-2);
-  border:1px solid var(--line-2); border-radius:10px; padding:10px 14px; cursor:pointer}
-.rsv-day:hover,.rsv-time:hover{border-color:var(--accent); color:var(--ink)}
-.rsv-day[aria-pressed="true"],.rsv-time[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
-.rsv-times{display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:8px}
 .rsv-msg{color:var(--muted); font-size:15px}
 .rsv-err{color:#B42318; font-size:14.5px; margin:14px 0 0}
 .rsv-sum{background:var(--accent-dim); border:1px solid var(--line); border-radius:10px; padding:13px 15px; font-size:15px; margin-bottom:18px}
@@ -295,6 +289,37 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent); outline:none
 .rsv-check input{width:auto; margin-top:3px}
 .rsv-hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
 @media(max-width:600px){.rsv-card{padding:18px}}
+
+/* calendar + time list, Cal.com-style two-pane picker */
+.rsv-cal{display:grid; grid-template-columns:1fr 220px; gap:0}
+.rsv-cal-main{padding-right:28px; border-right:1px solid var(--line-2)}
+.rsv-cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px}
+.rsv-cal-head h4{font-size:16px; margin:0}
+.rsv-cal-nav{display:flex; gap:6px}
+.rsv-cal-nav button{width:32px; height:32px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2);
+  color:var(--ink-2); cursor:pointer; font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center}
+.rsv-cal-nav button:hover:not(:disabled){border-color:var(--accent); color:var(--accent)}
+.rsv-cal-nav button:disabled{opacity:.35; cursor:default}
+.rsv-weekdays{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:6px}
+.rsv-weekdays span{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-align:center}
+.rsv-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px}
+.rsv-cell{aspect-ratio:1; border-radius:9px; border:1px solid transparent; background:none; font-family:var(--body);
+  font-size:14px; font-weight:600; color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center}
+.rsv-cell:hover:not(:disabled):not(.is-pad){background:var(--surface-2); border-color:var(--line-2)}
+.rsv-cell.is-pad{visibility:hidden; cursor:default}
+.rsv-cell:disabled:not(.is-pad){color:var(--line-2); cursor:default; text-decoration:line-through}
+.rsv-cell[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.rsv-times{padding-left:24px; max-height:340px; overflow-y:auto}
+.rsv-times h4{font-size:13.5px; color:var(--ink-2); margin:0 0 12px}
+.rsv-time{display:block; width:100%; font-family:var(--body); font-size:14.5px; font-weight:600; color:var(--ink-2);
+  background:var(--surface-2); border:1px solid var(--line-2); border-radius:10px; padding:10px 12px; cursor:pointer; margin-bottom:8px}
+.rsv-time:hover{border-color:var(--accent); color:var(--ink)}
+.rsv-time[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+@media(max-width:700px){
+  .rsv-cal{grid-template-columns:1fr}
+  .rsv-cal-main{padding-right:0; border-right:none; border-bottom:1px solid var(--line-2); padding-bottom:18px; margin-bottom:18px}
+  .rsv-times{padding-left:0; max-height:none}
+}
 
 /* ---------- privacy and terms pages ---------- */
 .legal{max-width:760px}
@@ -1708,7 +1733,7 @@ footer .wrap{position:relative; display:block}
     var tabs = document.querySelectorAll('.rsv-tabs button');
     var body = $('rsv-body'), form = $('rsv-form'), errEl = $('rsv-err'), go = $('rsv-go');
     if (!body) return;
-    var state = { plan: null, days: [], dayIdx: 0, start: null, label: '' };
+    var state = { plan: null, days: [], dateKey: null, viewY: null, viewM: null, start: null, label: '' };
     var started = false;
 
     function say(text) { body.className = 'rsv-msg'; body.textContent = text; }
@@ -1719,22 +1744,70 @@ footer .wrap{position:relative; display:block}
       });
     }
 
+    var WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+    var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
     function render() {
       body.className = ''; body.innerHTML = '';
       if (state.notice) {
         var n = document.createElement('p'); n.className = 'rsv-err'; n.style.margin = '0 0 14px'; n.textContent = state.notice;
         body.appendChild(n);
       }
-      var days = document.createElement('div'); days.className = 'rsv-days';
-      state.days.forEach(function (d, i) {
-        var b = document.createElement('button'); b.type = 'button'; b.className = 'rsv-day'; b.textContent = d.label;
-        b.setAttribute('aria-pressed', String(i === state.dayIdx));
-        b.addEventListener('click', function () { state.dayIdx = i; state.start = null; form.hidden = true; render(); });
-        days.appendChild(b);
-      });
-      body.appendChild(days);
+      var byDate = {};
+      state.days.forEach(function (d) { byDate[d.date] = d; });
+      if (state.viewY == null) {
+        var first = state.days[0].date.split('-');
+        state.viewY = +first[0]; state.viewM = +first[1] - 1;
+      }
+      var minKey = state.days[0].date, maxKey = state.days[state.days.length - 1].date;
+
+      var cal = document.createElement('div'); cal.className = 'rsv-cal';
+      var main = document.createElement('div'); main.className = 'rsv-cal-main';
+      var head = document.createElement('div'); head.className = 'rsv-cal-head';
+      var h4 = document.createElement('h4'); h4.textContent = MONTHS[state.viewM] + ' ' + state.viewY;
+      var nav = document.createElement('div'); nav.className = 'rsv-cal-nav';
+      var prevKey = new Date(Date.UTC(state.viewY, state.viewM, 0)).toISOString().slice(0, 10);
+      var nextKey = new Date(Date.UTC(state.viewY, state.viewM + 1, 1)).toISOString().slice(0, 10);
+      var prevBtn = document.createElement('button'); prevBtn.type = 'button'; prevBtn.textContent = '‹'; prevBtn.setAttribute('aria-label', 'Previous month');
+      prevBtn.disabled = prevKey < minKey;
+      prevBtn.addEventListener('click', function () { state.viewM--; if (state.viewM < 0) { state.viewM = 11; state.viewY--; } render(); });
+      var nextBtn = document.createElement('button'); nextBtn.type = 'button'; nextBtn.textContent = '›'; nextBtn.setAttribute('aria-label', 'Next month');
+      nextBtn.disabled = nextKey > maxKey;
+      nextBtn.addEventListener('click', function () { state.viewM++; if (state.viewM > 11) { state.viewM = 0; state.viewY++; } render(); });
+      nav.appendChild(prevBtn); nav.appendChild(nextBtn);
+      head.appendChild(h4); head.appendChild(nav);
+      main.appendChild(head);
+
+      var wk = document.createElement('div'); wk.className = 'rsv-weekdays';
+      WEEKDAYS.forEach(function (w) { var s = document.createElement('span'); s.textContent = w; wk.appendChild(s); });
+      main.appendChild(wk);
+
+      var grid = document.createElement('div'); grid.className = 'rsv-grid';
+      var firstOfMonth = new Date(Date.UTC(state.viewY, state.viewM, 1));
+      var startOffset = firstOfMonth.getUTCDay();
+      var daysInMonth = new Date(Date.UTC(state.viewY, state.viewM + 1, 0)).getUTCDate();
+      for (var i = 0; i < startOffset; i++) {
+        var pad = document.createElement('button'); pad.type = 'button'; pad.className = 'rsv-cell is-pad'; pad.disabled = true;
+        grid.appendChild(pad);
+      }
+      for (var d = 1; d <= daysInMonth; d++) {
+        var key = state.viewY + '-' + String(state.viewM + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        var cell = document.createElement('button'); cell.type = 'button'; cell.className = 'rsv-cell'; cell.textContent = String(d);
+        var has = !!byDate[key];
+        cell.disabled = !has;
+        if (has) {
+          cell.setAttribute('aria-pressed', String(key === state.dateKey));
+          cell.addEventListener('click', function (k) { return function () { state.dateKey = k; state.start = null; form.hidden = true; render(); }; }(key));
+        }
+        grid.appendChild(cell);
+      }
+      main.appendChild(grid);
+      cal.appendChild(main);
+
+      if (!state.dateKey || !byDate[state.dateKey]) state.dateKey = state.days[0].date;
+      var day = byDate[state.dateKey];
       var times = document.createElement('div'); times.className = 'rsv-times';
-      var day = state.days[state.dayIdx];
+      var th = document.createElement('h4'); th.textContent = day.label; times.appendChild(th);
       day.times.forEach(function (t) {
         var b = document.createElement('button'); b.type = 'button'; b.className = 'rsv-time'; b.textContent = t.label;
         b.setAttribute('aria-pressed', String(t.start === state.start));
@@ -1746,12 +1819,13 @@ footer .wrap{position:relative; display:block}
         });
         times.appendChild(b);
       });
-      body.appendChild(times);
+      cal.appendChild(times);
+      body.appendChild(cal);
     }
 
     function load(plan, notice) {
       if (!NAMES[plan]) plan = 'weekly';
-      state.plan = plan; state.start = null; state.dayIdx = 0; form.hidden = true; state.notice = notice || '';
+      state.plan = plan; state.start = null; state.dateKey = null; state.viewY = null; state.viewM = null; form.hidden = true; state.notice = notice || '';
       Array.prototype.forEach.call(tabs, function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-rplan') === plan)); });
       if (!API) { say('Online scheduling is opening soon. ' + CALL); return; }
       say('Loading open times…');
