@@ -191,8 +191,8 @@ section{padding:76px 0}
 .step p{color:var(--muted); font-size:15px; line-height:1.55; max-width:32ch; margin:0}
 .step-pics{display:grid; grid-template-columns:1fr 1fr; gap:10px}
 .step-pics figure{margin:0; aspect-ratio:4/5; overflow:hidden; border-radius:10px; background:#0B1524}
-.step-pics img{width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease}
-.step-pics figure:hover img{transform:scale(1.04)}
+.step-pics img,.step-pics video{width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease}
+.step-pics figure:hover img,.step-pics figure:hover video{transform:scale(1.04)}
 
 /* ---------- price table ---------- */
 .ptable{overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--surface)}
@@ -1046,7 +1046,7 @@ footer .wrap{position:relative; display:block}
           </div>
           <div class="step-pics">
             <figure><img src="img/process/step-01a.jpg?v=32ff98e8" alt="Foam cannon coating the Corvette in pre-wash foam" loading="lazy"></figure>
-            <figure><img src="img/process/step-01b.jpg?v=5b5945c5" alt="Foam cannon covering the side of the car" loading="lazy"></figure>
+            <figure><video src="img/process/step-01.mp4" poster="img/process/step-01b.jpg?v=5b5945c5" autoplay muted loop playsinline preload="metadata" aria-label="Foam cannon covering the side of the car"></video></figure>
           </div>
         </article>
         <article class="step">
@@ -1056,8 +1056,8 @@ footer .wrap{position:relative; display:block}
             <p>High-pressure rinse removes loosened dirt and foam residue.</p>
           </div>
           <div class="step-pics">
-            <figure><img src="img/process/step-02a.jpg?v=1c6f36f8" alt="Rinsing foam off the hood with a pressure washer" loading="lazy"></figure>
-            <figure><img src="img/process/step-02b.jpg?v=e1f5e602" alt="Rinsing the front of the car" loading="lazy"></figure>
+            <figure><img src="img/process/step-02a.jpg?v=493ab9b7" alt="Rinsing the front bumper of the black Corvette with a pressure washer" loading="lazy"></figure>
+            <figure><img src="img/process/step-02b.jpg?v=e96b47ea" alt="Pressure washing thick foam off the front of the car" loading="lazy"></figure>
           </div>
         </article>
         <article class="step">
@@ -1089,7 +1089,7 @@ footer .wrap{position:relative; display:block}
             <p>Gentle two-bucket hand wash for a swirl-free, showroom finish.</p>
           </div>
           <div class="step-pics">
-            <figure><img src="img/process/step-05a.jpg?v=4e9c5ca2" alt="Dipping the wash mitt into one of the two wash buckets" loading="lazy"></figure>
+            <figure><video src="img/process/step-05.mp4" poster="img/process/step-05a.jpg?v=4e9c5ca2" autoplay muted loop playsinline preload="metadata" aria-label="Dipping the wash mitt into the bucket, then laying suds across the hood"></video></figure>
             <figure><img src="img/process/step-05b.jpg?v=f5111adb" alt="Suds landing on the hood as the mitt washes the car" loading="lazy"></figure>
           </div>
         </article>
