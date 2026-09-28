@@ -39,5 +39,8 @@
   "cal": {
     "link": "vanyans-auto.detail",
     "memberLink": "vanyans-auto.detail/plan-{plan}"
+  },
+  "booking": {
+    "apiBase": "https://vanyans-plans.gordjalayan.workers.dev"
   }
 }

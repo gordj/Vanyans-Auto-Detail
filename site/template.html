@@ -277,6 +277,33 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent); outline:none
 .sq-cta p{margin:0 0 20px; color:var(--muted); font-size:15px}
 .sq-embed{margin-top:26px; border:1px solid var(--line-2); border-radius:14px;
   background:var(--surface); overflow:hidden}
+
+/* ---------- plan reservation: pick a time, then check out ---------- */
+.rsv{margin-top:26px; display:grid; gap:22px; max-width:760px}
+.rsv-card{border:1px solid var(--line-2); border-radius:14px; background:var(--surface); padding:24px}
+.rsv-card h3{font-size:19px; margin:0 0 16px}
+.rsv-days{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px}
+.rsv-day,.rsv-time{font-family:var(--body); font-size:14.5px; font-weight:600; color:var(--ink-2); background:var(--surface-2);
+  border:1px solid var(--line-2); border-radius:10px; padding:10px 14px; cursor:pointer}
+.rsv-day:hover,.rsv-time:hover{border-color:var(--accent); color:var(--ink)}
+.rsv-day[aria-pressed="true"],.rsv-time[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.rsv-times{display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:8px}
+.rsv-msg{color:var(--muted); font-size:15px}
+.rsv-err{color:#B42318; font-size:14.5px; margin:14px 0 0}
+.rsv-sum{background:var(--accent-dim); border:1px solid var(--line); border-radius:10px; padding:13px 15px; font-size:15px; margin-bottom:18px}
+.rsv-check{display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--ink-2); margin:6px 0 18px}
+.rsv-check input{width:auto; margin-top:3px}
+.rsv-hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
+@media(max-width:600px){.rsv-card{padding:18px}}
+
+/* ---------- privacy and terms pages ---------- */
+.legal{max-width:760px}
+.legal h3{font-size:19px; margin:30px 0 8px}
+.legal p,.legal li{color:var(--ink-2); font-size:16px; line-height:1.7}
+.legal p{margin:0 0 12px}
+.legal ul{margin:0 0 12px; padding-left:22px}
+.legal li{margin-bottom:6px}
+.legal a{color:var(--accent)}
 .sq-embed iframe{display:block; width:100%; min-height:560px; border:0}
 .sq-fallback{padding:70px 24px; text-align:center; color:var(--muted); font-size:15px}
 .sq-fallback a{color:var(--accent); font-weight:600}
@@ -1617,6 +1644,163 @@ footer .wrap{position:relative; display:block}
   </script>
 </main>
 
+<!-- ==================== RESERVE (pick a time first, then check out) ==================== -->
+<main data-page="reserve" hidden>
+  <section id="reserve">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Maintenance plans</span>
+        <h2>Pick your time.</h2>
+        <p>Choose the day and time of your first visit. Every visit after that is the same day and time, with no more booking.
+          You check out on the next step.</p>
+      </div>
+      <div class="sched-tabs-row">
+        <div class="tabs rsv-tabs" role="tablist" aria-label="Your plan">
+          <button type="button" role="tab" data-rplan="weekly" aria-selected="true">Weekly</button>
+          <button type="button" role="tab" data-rplan="biweekly" aria-selected="false">Every two weeks</button>
+          <button type="button" role="tab" data-rplan="monthly" aria-selected="false">Monthly</button>
+        </div>
+      </div>
+      <div class="rsv">
+        <div class="rsv-card">
+          <h3>1. Choose a day and time</h3>
+          <div id="rsv-body" class="rsv-msg">Loading open times&hellip;</div>
+        </div>
+        <form class="rsv-card" id="rsv-form" hidden novalidate>
+          <h3>2. Your details</h3>
+          <div class="rsv-sum" id="rsv-sum"></div>
+          <div class="frow">
+            <div class="field"><label for="rsv-name">Your name</label><input id="rsv-name" autocomplete="name" maxlength="80"></div>
+            <div class="field"><label for="rsv-email">Email</label><input id="rsv-email" type="email" autocomplete="email" maxlength="120"></div>
+          </div>
+          <div class="frow">
+            <div class="field"><label for="rsv-phone">Mobile number</label><input id="rsv-phone" type="tel" autocomplete="tel" maxlength="30"></div>
+            <div class="field"><label for="rsv-vehicle">Vehicle</label><input id="rsv-vehicle" placeholder="Year, make, model" maxlength="80"></div>
+          </div>
+          <div class="field" style="margin-bottom:16px"><label for="rsv-address">Where is the car parked?</label>
+            <input id="rsv-address" autocomplete="street-address" placeholder="Street address, city" maxlength="200"></div>
+          <label class="rsv-check" id="rsv-sms-wrap" style="display:none"><input type="checkbox" id="rsv-sms">
+            <span>Text me a reminder 24 hours before each visit. Message and data rates may apply. Reply STOP to opt out.</span></label>
+          <div class="rsv-hp" aria-hidden="true"><label>Website<input id="rsv-hp" tabindex="-1" autocomplete="off"></label></div>
+          <div class="form-foot">
+            <button class="btn btn-primary gloss" type="submit" id="rsv-go">Continue to checkout</button>
+            <small>We hold your time for 30 minutes while you check out.</small>
+          </div>
+          <p class="rsv-err" id="rsv-err" role="alert" hidden></p>
+        </form>
+      </div>
+      <p class="book-fee">Just need one detail? <a href="#/book">Book a single service</a>.</p>
+    </div>
+  </section>
+  <script>
+  /* Reserve page: open times come from the scheduling worker (Google Calendar). Picking a time and
+     filling the form holds the slot for 30 minutes, then sends the client to Stripe checkout.
+     ?plan=weekly|biweekly|monthly preselects a plan. */
+  (function () {
+    var API = "{{API_BASE}}";
+    var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    var override = local ? new URLSearchParams(location.search).get('api') : null;
+    if (override) API = override;
+    var CALL = 'Call or text 818.660.5845 and we will set it up for you.';
+    var NAMES = { weekly: 'Weekly', biweekly: 'Every two weeks', monthly: 'Monthly' };
+    var CADENCE = { weekly: 'every week', biweekly: 'every two weeks', monthly: 'every four weeks' };
+    var $ = function (id) { return document.getElementById(id); };
+    var tabs = document.querySelectorAll('.rsv-tabs button');
+    var body = $('rsv-body'), form = $('rsv-form'), errEl = $('rsv-err'), go = $('rsv-go');
+    if (!body) return;
+    var state = { plan: null, days: [], dayIdx: 0, start: null, label: '' };
+    var started = false;
+
+    function say(text) { body.className = 'rsv-msg'; body.textContent = text; }
+    function fail(text) { errEl.textContent = text; errEl.hidden = false; go.disabled = false; go.textContent = 'Continue to checkout'; }
+    function call(path, opts) {
+      return fetch(API + path, opts).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, json: j }; });
+      });
+    }
+
+    function render() {
+      body.className = ''; body.innerHTML = '';
+      if (state.notice) {
+        var n = document.createElement('p'); n.className = 'rsv-err'; n.style.margin = '0 0 14px'; n.textContent = state.notice;
+        body.appendChild(n);
+      }
+      var days = document.createElement('div'); days.className = 'rsv-days';
+      state.days.forEach(function (d, i) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'rsv-day'; b.textContent = d.label;
+        b.setAttribute('aria-pressed', String(i === state.dayIdx));
+        b.addEventListener('click', function () { state.dayIdx = i; state.start = null; form.hidden = true; render(); });
+        days.appendChild(b);
+      });
+      body.appendChild(days);
+      var times = document.createElement('div'); times.className = 'rsv-times';
+      var day = state.days[state.dayIdx];
+      day.times.forEach(function (t) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'rsv-time'; b.textContent = t.label;
+        b.setAttribute('aria-pressed', String(t.start === state.start));
+        b.addEventListener('click', function () {
+          state.start = t.start; state.label = day.label + ' at ' + t.label;
+          $('rsv-sum').textContent = NAMES[state.plan] + ' plan. First visit ' + state.label + ', then ' + CADENCE[state.plan] + ' at the same time.';
+          form.hidden = false; errEl.hidden = true; render();
+          form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        times.appendChild(b);
+      });
+      body.appendChild(times);
+    }
+
+    function load(plan, notice) {
+      if (!NAMES[plan]) plan = 'weekly';
+      state.plan = plan; state.start = null; state.dayIdx = 0; form.hidden = true; state.notice = notice || '';
+      Array.prototype.forEach.call(tabs, function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-rplan') === plan)); });
+      if (!API) { say('Online scheduling is opening soon. ' + CALL); return; }
+      say('Loading open times…');
+      call('/api/slots?plan=' + plan).then(function (r) {
+        if (state.plan !== plan) return;
+        if (!r.ok) { say((r.json && r.json.error) || ('We could not load times. ' + CALL)); return; }
+        state.days = r.json.days || [];
+        state.sms = !!r.json.sms; // text reminders (and their consent box) exist only once Twilio is set up
+        $('rsv-sms-wrap').style.display = state.sms ? 'flex' : 'none';
+        if (!state.days.length) { say('No open times in the next three weeks. ' + CALL); return; }
+        render();
+      }).catch(function () { say('We could not load times. ' + CALL); });
+    }
+
+    Array.prototype.forEach.call(tabs, function (b) {
+      b.addEventListener('click', function () { load(b.getAttribute('data-rplan')); });
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errEl.hidden = true;
+      if (!state.start) { fail('Pick a day and time first.'); return; }
+      go.disabled = true; go.textContent = 'Holding your time…';
+      call('/api/hold', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plan: state.plan, start: state.start, name: $('rsv-name').value, email: $('rsv-email').value,
+          phone: $('rsv-phone').value, address: $('rsv-address').value, vehicle: $('rsv-vehicle').value,
+          smsConsent: state.sms ? $('rsv-sms').checked : false, website: $('rsv-hp').value })
+      }).then(function (r) {
+        if (r.ok && r.json.checkoutUrl) { go.textContent = 'Taking you to checkout…'; window.location.href = r.json.checkoutUrl; return; }
+        fail((r.json && r.json.error) || ('Something went wrong. ' + CALL));
+        if (r.status === 409) load(state.plan, (r.json && r.json.error) || 'That time was just taken. Please pick another.');
+      }).catch(function () { fail('We could not reach the scheduler. ' + CALL); });
+    });
+
+    function start() {
+      if (started) return;
+      var m = document.querySelector('main[data-page="reserve"]');
+      if (!m || m.hidden) return;
+      started = true;
+      var q = location.search || (location.hash.indexOf('?') > -1 ? location.hash.slice(location.hash.indexOf('?')) : '');
+      load(new URLSearchParams(q).get('plan') || 'weekly');
+    }
+    start();
+    window.addEventListener('hashchange', function () { setTimeout(start, 60); });
+  })();
+  </script>
+</main>
+
 <main data-page="welcome" hidden>
   <section>
     <div class="wrap">
@@ -1631,6 +1815,128 @@ footer .wrap{position:relative; display:block}
       <p class="plans-note">Need a different day later, or want to skip one? Call or text
         <a href="tel:+18186605845">818.660.5845</a> and we will move it. Update your card, switch plans
         or cancel anytime in <a href="https://billing.stripe.com/p/login/14AfZaaZXeOM1pO6mUdnW00">your plan portal</a>.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ==================== PRIVACY POLICY ==================== -->
+<main data-page="privacy" hidden>
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Legal</span>
+        <h2>Privacy policy</h2>
+        <p>Last updated September 28, 2026</p>
+      </div>
+      <div class="legal">
+        <h3>Who we are</h3>
+        <p>Vanyan&rsquo;s Auto Detail is a mobile car detailing business based in Burbank, California. Questions about this policy:
+          call or text <a href="tel:+18186605845">818.660.5845</a> or email
+          <a href="mailto:Vanyansdetailing@gmail.com">Vanyansdetailing@gmail.com</a>.</p>
+
+        <h3>What we collect</h3>
+        <ul>
+          <li>Your name, email address and mobile number.</li>
+          <li>The address where your vehicle is parked, and your vehicle&rsquo;s year, make and model.</li>
+          <li>Your chosen plan and the day and time of your visits.</li>
+          <li>Payment details, which you enter on Stripe&rsquo;s secure checkout. We never see or store your full card number.</li>
+          <li>Anything you send us when you call, text or email.</li>
+        </ul>
+
+        <h3>How we use it</h3>
+        <ul>
+          <li>To schedule and carry out your detailing visits.</li>
+          <li>To bill you for your plan and let you manage it.</li>
+          <li>To send you one confirmation email when you sign up.</li>
+          <li>To send appointment reminder texts, only if you agree to them (see text messages below).</li>
+          <li>To answer your questions and keep the records we need for our business and taxes.</li>
+        </ul>
+        <p>We do not sell your information, and we do not use it for advertising.</p>
+
+        <h3>Text messages</h3>
+        <p>If you tick the box to receive text reminders, we will text your mobile number about one reminder before each scheduled
+          visit. Agreeing is not a condition of buying anything. Message and data rates may apply. Reply STOP at any time to
+          opt out, or HELP for help. We do not share mobile numbers or text-message consent with third parties or affiliates
+          for marketing purposes.</p>
+
+        <h3>Who we share it with</h3>
+        <p>Only with companies that help us run the service, and only what they need to do their job:</p>
+        <ul>
+          <li>Stripe, to take payments and manage plans.</li>
+          <li>Google, where our calendar lives, so that visits appear on our schedule.</li>
+          <li>Cloudflare, which hosts this website and our scheduling tools.</li>
+          <li>Our email and text-message providers, to send your confirmation and reminders.</li>
+          <li>Cal.com, if you book a one-time service through our booking page.</li>
+        </ul>
+        <p>We may also disclose information if the law requires it.</p>
+
+        <h3>Google Calendar</h3>
+        <p>Our scheduling tool connects to our own Google Calendar to create and manage appointments. It does not read or
+          access your Google account. Our use of information received from Google APIs follows the
+          <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+          including its Limited Use requirements.</p>
+
+        <h3>How long we keep it</h3>
+        <p>We keep your information while you are a customer and for a reasonable time afterward for our records and taxes.</p>
+
+        <h3>Your choices</h3>
+        <p>You can ask to see, correct or delete your information at any time by calling, texting or emailing us. You can cancel
+          your plan yourself in the plan portal, and you can stop texts by replying STOP.</p>
+
+        <h3>Children</h3>
+        <p>Our services are for adults who own or manage a vehicle. We do not knowingly collect information from children.</p>
+
+        <h3>Changes</h3>
+        <p>If we change this policy we will update the date at the top of this page.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ==================== TERMS AND TEXTING ==================== -->
+<main data-page="terms" hidden>
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Legal</span>
+        <h2>Terms &amp; text messaging</h2>
+        <p>Last updated September 28, 2026</p>
+      </div>
+      <div class="legal">
+        <h3>Our services</h3>
+        <p>Vanyan&rsquo;s Auto Detail provides mobile car detailing at the address you give us. Prices for one-time services are
+          on our <a href="#/services">Services</a> page.</p>
+
+        <h3>Maintenance plans</h3>
+        <ul>
+          <li>A plan is weekly, every two weeks, or monthly (every four weeks), at the price shown for that plan.</li>
+          <li>You choose the day and time of your first visit before you check out. Every visit after that is at the same day and
+            time, and repeats until you cancel.</li>
+          <li>Plans are billed through Stripe. You can update your card, switch plans or cancel any time in the plan portal.
+            When a plan ends, its future visits end with it.</li>
+          <li>To skip or move a single visit, call or text us at <a href="tel:+18186605845">818.660.5845</a>. If we ever need to
+            move a visit, we will contact you first.</li>
+          <li>Questions about a charge? Call or text us and we will sort it out.</li>
+        </ul>
+
+        <h3>Text message reminders</h3>
+        <ul>
+          <li><strong>Program:</strong> Vanyan&rsquo;s Auto Detail appointment reminders.</li>
+          <li><strong>What we send:</strong> a reminder before each scheduled visit. We do not send marketing texts.</li>
+          <li><strong>How often:</strong> about one message before each visit.</li>
+          <li><strong>Consent:</strong> you agree by ticking the text-reminder box when you schedule. Agreeing is not a condition of
+            buying anything.</li>
+          <li><strong>Cost:</strong> message and data rates may apply.</li>
+          <li><strong>Opt out:</strong> reply STOP at any time. Reply HELP for help, or contact us at
+            <a href="tel:+18186605845">818.660.5845</a> or
+            <a href="mailto:Vanyansdetailing@gmail.com">Vanyansdetailing@gmail.com</a>.</li>
+          <li>Wireless carriers are not liable for delayed or undelivered messages.</li>
+          <li>See our <a href="#/privacy">privacy policy</a> for how we handle your mobile number.</li>
+        </ul>
+
+        <h3>Changes</h3>
+        <p>If we change these terms we will update the date at the top of this page.</p>
+      </div>
     </div>
   </section>
 </main>
@@ -1682,6 +1988,8 @@ footer .wrap{position:relative; display:block}
           <h4>Company</h4>
           <a href="#/about">About Us</a>
           <a href="#/area">Service Area</a>
+          <a href="#/privacy">Privacy Policy</a>
+          <a href="#/terms">Terms &amp; Texting</a>
         </div>
 
         <div class="foot-col">

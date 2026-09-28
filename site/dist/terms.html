@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Book a Detail | Vanyan's Auto Detail, Burbank</title>
-<meta name="description" content="Book mobile detailing in Burbank. Call or text 818-660-5845 any hour, or send your vehicle details and we reply with a time and a firm price.">
-<link rel="canonical" href="https://vanyansautodetail.com/book">
+<title>Terms & Text Messaging | Vanyan's Auto Detail</title>
+<meta name="description" content="Terms for Vanyan's Auto Detail maintenance plans and appointment reminder text messages.">
+<link rel="canonical" href="https://vanyansautodetail.com/terms">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#F7F6F3">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Vanyan's Auto Detail">
-<meta property="og:title" content="Book a Detail | Vanyan's Auto Detail, Burbank">
-<meta property="og:description" content="Book mobile detailing in Burbank. Call or text 818-660-5845 any hour, or send your vehicle details and we reply with a time and a firm price.">
-<meta property="og:url" content="https://vanyansautodetail.com/book">
+<meta property="og:title" content="Terms & Text Messaging | Vanyan's Auto Detail">
+<meta property="og:description" content="Terms for Vanyan's Auto Detail maintenance plans and appointment reminder text messages.">
+<meta property="og:url" content="https://vanyansautodetail.com/terms">
 <meta property="og:image" content="https://vanyansautodetail.com/img/hero.jpg?v=b71f08b2">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="img/logo.jpg?v=36bb1e71">
@@ -1056,58 +1056,57 @@ footer .wrap{position:relative; display:block}
 <!-- ==================== AREA ==================== -->
 <!-- ==================== ABOUT ==================== -->
 <!-- ==================== BOOK ==================== -->
-<main data-page="book">
-  <section id="booknow">
-    <div class="wrap">
-      <div class="sec-head">
-        <span class="eyebrow">Book online</span>
-        <h2>Full detail from $185.</h2>
-        <p>Pick a day. Book within minutes. Pay after the job.</p>
-      </div>
-      <div class="sq-embed"><div class="cal-inline" id="cal-book"></div>
-<script>
-/* Cal.com inline booking, shared by build.ps1 and makepreview.py (they swap in the
-   link and a namespace). Inline means no pop-up and no new tab: the calendar, the
-   form and the Stripe card step all happen inside this page, which is what keeps
-   it frictionless on a phone. */
-(function (C, A, L) { var p = function (a, ar) { a.q.push(ar); }; var d = C.document;
-  C.Cal = C.Cal || function () { var cal = C.Cal; var ar = arguments;
-    if (!cal.loaded) { cal.ns = {}; cal.q = cal.q || []; d.head.appendChild(d.createElement("script")).src = A; cal.loaded = true; }
-    if (ar[0] === L) { var api = function () { p(api, arguments); }; var namespace = ar[1]; api.q = api.q || [];
-      if (typeof namespace === "string") { cal.ns[namespace] = cal.ns[namespace] || api; p(cal.ns[namespace], ar); p(cal, ["initNamespace", namespace]); }
-      else p(cal, ar); return; }
-    p(cal, ar); };
-})(window, "https://app.cal.com/embed/embed.js", "init");
-Cal("init", "book", { origin: "https://cal.com" });
-Cal.ns["book"]("inline", {
-  elementOrSelector: "#cal-book",
-  /* "{plan}" in the link is filled from ?plan= (weekly, biweekly, monthly), which the
-     Stripe plan checkouts pass along, so each member lands on their plan's repeating slot. */
-  calLink: "vanyans-auto.detail".replace("{plan}", (function () {
-    var p = new URLSearchParams(location.search).get("plan");
-    return ["weekly", "biweekly", "monthly"].indexOf(p) > -1 ? p : "visit";
-  })()),
-  config: { layout: window.innerWidth < 760 ? "column_view" : "month_view", theme: "light" }
-});
-Cal.ns["book"]("ui", {
-  theme: "light",
-  hideEventTypeDetails: false,
-  layout: window.innerWidth < 760 ? "column_view" : "month_view",
-  cssVarsPerTheme: { light: { "cal-brand": "#1B6DE0" } }
-});
-</script>
-</div>
-      <p class="book-fee">$25 cancellation fee.</p>
-    </div>
-  </section>
-
-</main>
-
-
 <!-- ==================== WELCOME (post subscription) ==================== -->
 <!-- ==================== RESERVE (pick a time first, then check out) ==================== -->
 <!-- ==================== PRIVACY POLICY ==================== -->
 <!-- ==================== TERMS AND TEXTING ==================== -->
+<main data-page="terms">
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Legal</span>
+        <h2>Terms &amp; text messaging</h2>
+        <p>Last updated September 28, 2026</p>
+      </div>
+      <div class="legal">
+        <h3>Our services</h3>
+        <p>Vanyan&rsquo;s Auto Detail provides mobile car detailing at the address you give us. Prices for one-time services are
+          on our <a href="/services">Services</a> page.</p>
+
+        <h3>Maintenance plans</h3>
+        <ul>
+          <li>A plan is weekly, every two weeks, or monthly (every four weeks), at the price shown for that plan.</li>
+          <li>You choose the day and time of your first visit before you check out. Every visit after that is at the same day and
+            time, and repeats until you cancel.</li>
+          <li>Plans are billed through Stripe. You can update your card, switch plans or cancel any time in the plan portal.
+            When a plan ends, its future visits end with it.</li>
+          <li>To skip or move a single visit, call or text us at <a href="tel:+18186605845">818.660.5845</a>. If we ever need to
+            move a visit, we will contact you first.</li>
+          <li>Questions about a charge? Call or text us and we will sort it out.</li>
+        </ul>
+
+        <h3>Text message reminders</h3>
+        <ul>
+          <li><strong>Program:</strong> Vanyan&rsquo;s Auto Detail appointment reminders.</li>
+          <li><strong>What we send:</strong> a reminder before each scheduled visit. We do not send marketing texts.</li>
+          <li><strong>How often:</strong> about one message before each visit.</li>
+          <li><strong>Consent:</strong> you agree by ticking the text-reminder box when you schedule. Agreeing is not a condition of
+            buying anything.</li>
+          <li><strong>Cost:</strong> message and data rates may apply.</li>
+          <li><strong>Opt out:</strong> reply STOP at any time. Reply HELP for help, or contact us at
+            <a href="tel:+18186605845">818.660.5845</a> or
+            <a href="mailto:Vanyansdetailing@gmail.com">Vanyansdetailing@gmail.com</a>.</li>
+          <li>Wireless carriers are not liable for delayed or undelivered messages.</li>
+          <li>See our <a href="/privacy">privacy policy</a> for how we handle your mobile number.</li>
+        </ul>
+
+        <h3>Changes</h3>
+        <p>If we change these terms we will update the date at the top of this page.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
 <footer>
   <div class="wrap">
     <div class="foot-top">

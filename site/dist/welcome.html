@@ -298,6 +298,33 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent); outline:none
 .sq-cta p{margin:0 0 20px; color:var(--muted); font-size:15px}
 .sq-embed{margin-top:26px; border:1px solid var(--line-2); border-radius:14px;
   background:var(--surface); overflow:hidden}
+
+/* ---------- plan reservation: pick a time, then check out ---------- */
+.rsv{margin-top:26px; display:grid; gap:22px; max-width:760px}
+.rsv-card{border:1px solid var(--line-2); border-radius:14px; background:var(--surface); padding:24px}
+.rsv-card h3{font-size:19px; margin:0 0 16px}
+.rsv-days{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px}
+.rsv-day,.rsv-time{font-family:var(--body); font-size:14.5px; font-weight:600; color:var(--ink-2); background:var(--surface-2);
+  border:1px solid var(--line-2); border-radius:10px; padding:10px 14px; cursor:pointer}
+.rsv-day:hover,.rsv-time:hover{border-color:var(--accent); color:var(--ink)}
+.rsv-day[aria-pressed="true"],.rsv-time[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.rsv-times{display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:8px}
+.rsv-msg{color:var(--muted); font-size:15px}
+.rsv-err{color:#B42318; font-size:14.5px; margin:14px 0 0}
+.rsv-sum{background:var(--accent-dim); border:1px solid var(--line); border-radius:10px; padding:13px 15px; font-size:15px; margin-bottom:18px}
+.rsv-check{display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--ink-2); margin:6px 0 18px}
+.rsv-check input{width:auto; margin-top:3px}
+.rsv-hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
+@media(max-width:600px){.rsv-card{padding:18px}}
+
+/* ---------- privacy and terms pages ---------- */
+.legal{max-width:760px}
+.legal h3{font-size:19px; margin:30px 0 8px}
+.legal p,.legal li{color:var(--ink-2); font-size:16px; line-height:1.7}
+.legal p{margin:0 0 12px}
+.legal ul{margin:0 0 12px; padding-left:22px}
+.legal li{margin-bottom:6px}
+.legal a{color:var(--accent)}
 .sq-embed iframe{display:block; width:100%; min-height:560px; border:0}
 .sq-fallback{padding:70px 24px; text-align:center; color:var(--muted); font-size:15px}
 .sq-fallback a{color:var(--accent); font-weight:600}
@@ -1030,6 +1057,7 @@ footer .wrap{position:relative; display:block}
 <!-- ==================== ABOUT ==================== -->
 <!-- ==================== BOOK ==================== -->
 <!-- ==================== WELCOME (post subscription) ==================== -->
+<!-- ==================== RESERVE (pick a time first, then check out) ==================== -->
 <main data-page="welcome">
   <section>
     <div class="wrap">
@@ -1080,6 +1108,8 @@ Cal.ns["member"]("ui", {
   </section>
 </main>
 
+<!-- ==================== PRIVACY POLICY ==================== -->
+<!-- ==================== TERMS AND TEXTING ==================== -->
 <footer>
   <div class="wrap">
     <div class="foot-top">
@@ -1127,6 +1157,8 @@ Cal.ns["member"]("ui", {
           <h4>Company</h4>
           <a href="/about">About Us</a>
           <a href="/area">Service Area</a>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/terms">Terms &amp; Texting</a>
         </div>
 
         <div class="foot-col">

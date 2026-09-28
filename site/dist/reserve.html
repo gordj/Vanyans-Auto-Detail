@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Book a Detail | Vanyan's Auto Detail, Burbank</title>
-<meta name="description" content="Book mobile detailing in Burbank. Call or text 818-660-5845 any hour, or send your vehicle details and we reply with a time and a firm price.">
-<link rel="canonical" href="https://vanyansautodetail.com/book">
-<meta name="robots" content="index, follow">
+<title>Reserve Your Plan Time | Vanyan's Auto Detail</title>
+<meta name="description" content="Pick the day and time for your maintenance plan. Your visit repeats automatically.">
+<link rel="canonical" href="https://vanyansautodetail.com/reserve">
+<meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F7F6F3">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Vanyan's Auto Detail">
-<meta property="og:title" content="Book a Detail | Vanyan's Auto Detail, Burbank">
-<meta property="og:description" content="Book mobile detailing in Burbank. Call or text 818-660-5845 any hour, or send your vehicle details and we reply with a time and a firm price.">
-<meta property="og:url" content="https://vanyansautodetail.com/book">
+<meta property="og:title" content="Reserve Your Plan Time | Vanyan's Auto Detail">
+<meta property="og:description" content="Pick the day and time for your maintenance plan. Your visit repeats automatically.">
+<meta property="og:url" content="https://vanyansautodetail.com/reserve">
 <meta property="og:image" content="https://vanyansautodetail.com/img/hero.jpg?v=b71f08b2">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="img/logo.jpg?v=36bb1e71">
@@ -1056,56 +1056,164 @@ footer .wrap{position:relative; display:block}
 <!-- ==================== AREA ==================== -->
 <!-- ==================== ABOUT ==================== -->
 <!-- ==================== BOOK ==================== -->
-<main data-page="book">
-  <section id="booknow">
-    <div class="wrap">
-      <div class="sec-head">
-        <span class="eyebrow">Book online</span>
-        <h2>Full detail from $185.</h2>
-        <p>Pick a day. Book within minutes. Pay after the job.</p>
-      </div>
-      <div class="sq-embed"><div class="cal-inline" id="cal-book"></div>
-<script>
-/* Cal.com inline booking, shared by build.ps1 and makepreview.py (they swap in the
-   link and a namespace). Inline means no pop-up and no new tab: the calendar, the
-   form and the Stripe card step all happen inside this page, which is what keeps
-   it frictionless on a phone. */
-(function (C, A, L) { var p = function (a, ar) { a.q.push(ar); }; var d = C.document;
-  C.Cal = C.Cal || function () { var cal = C.Cal; var ar = arguments;
-    if (!cal.loaded) { cal.ns = {}; cal.q = cal.q || []; d.head.appendChild(d.createElement("script")).src = A; cal.loaded = true; }
-    if (ar[0] === L) { var api = function () { p(api, arguments); }; var namespace = ar[1]; api.q = api.q || [];
-      if (typeof namespace === "string") { cal.ns[namespace] = cal.ns[namespace] || api; p(cal.ns[namespace], ar); p(cal, ["initNamespace", namespace]); }
-      else p(cal, ar); return; }
-    p(cal, ar); };
-})(window, "https://app.cal.com/embed/embed.js", "init");
-Cal("init", "book", { origin: "https://cal.com" });
-Cal.ns["book"]("inline", {
-  elementOrSelector: "#cal-book",
-  /* "{plan}" in the link is filled from ?plan= (weekly, biweekly, monthly), which the
-     Stripe plan checkouts pass along, so each member lands on their plan's repeating slot. */
-  calLink: "vanyans-auto.detail".replace("{plan}", (function () {
-    var p = new URLSearchParams(location.search).get("plan");
-    return ["weekly", "biweekly", "monthly"].indexOf(p) > -1 ? p : "visit";
-  })()),
-  config: { layout: window.innerWidth < 760 ? "column_view" : "month_view", theme: "light" }
-});
-Cal.ns["book"]("ui", {
-  theme: "light",
-  hideEventTypeDetails: false,
-  layout: window.innerWidth < 760 ? "column_view" : "month_view",
-  cssVarsPerTheme: { light: { "cal-brand": "#1B6DE0" } }
-});
-</script>
-</div>
-      <p class="book-fee">$25 cancellation fee.</p>
-    </div>
-  </section>
-
-</main>
-
-
 <!-- ==================== WELCOME (post subscription) ==================== -->
 <!-- ==================== RESERVE (pick a time first, then check out) ==================== -->
+<main data-page="reserve">
+  <section id="reserve">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Maintenance plans</span>
+        <h2>Pick your time.</h2>
+        <p>Choose the day and time of your first visit. Every visit after that is the same day and time, with no more booking.
+          You check out on the next step.</p>
+      </div>
+      <div class="sched-tabs-row">
+        <div class="tabs rsv-tabs" role="tablist" aria-label="Your plan">
+          <button type="button" role="tab" data-rplan="weekly" aria-selected="true">Weekly</button>
+          <button type="button" role="tab" data-rplan="biweekly" aria-selected="false">Every two weeks</button>
+          <button type="button" role="tab" data-rplan="monthly" aria-selected="false">Monthly</button>
+        </div>
+      </div>
+      <div class="rsv">
+        <div class="rsv-card">
+          <h3>1. Choose a day and time</h3>
+          <div id="rsv-body" class="rsv-msg">Loading open times&hellip;</div>
+        </div>
+        <form class="rsv-card" id="rsv-form" hidden novalidate>
+          <h3>2. Your details</h3>
+          <div class="rsv-sum" id="rsv-sum"></div>
+          <div class="frow">
+            <div class="field"><label for="rsv-name">Your name</label><input id="rsv-name" autocomplete="name" maxlength="80"></div>
+            <div class="field"><label for="rsv-email">Email</label><input id="rsv-email" type="email" autocomplete="email" maxlength="120"></div>
+          </div>
+          <div class="frow">
+            <div class="field"><label for="rsv-phone">Mobile number</label><input id="rsv-phone" type="tel" autocomplete="tel" maxlength="30"></div>
+            <div class="field"><label for="rsv-vehicle">Vehicle</label><input id="rsv-vehicle" placeholder="Year, make, model" maxlength="80"></div>
+          </div>
+          <div class="field" style="margin-bottom:16px"><label for="rsv-address">Where is the car parked?</label>
+            <input id="rsv-address" autocomplete="street-address" placeholder="Street address, city" maxlength="200"></div>
+          <label class="rsv-check" id="rsv-sms-wrap" style="display:none"><input type="checkbox" id="rsv-sms">
+            <span>Text me a reminder 24 hours before each visit. Message and data rates may apply. Reply STOP to opt out.</span></label>
+          <div class="rsv-hp" aria-hidden="true"><label>Website<input id="rsv-hp" tabindex="-1" autocomplete="off"></label></div>
+          <div class="form-foot">
+            <button class="btn btn-primary gloss" type="submit" id="rsv-go">Continue to checkout</button>
+            <small>We hold your time for 30 minutes while you check out.</small>
+          </div>
+          <p class="rsv-err" id="rsv-err" role="alert" hidden></p>
+        </form>
+      </div>
+      <p class="book-fee">Just need one detail? <a href="/book">Book a single service</a>.</p>
+    </div>
+  </section>
+  <script>
+  /* Reserve page: open times come from the scheduling worker (Google Calendar). Picking a time and
+     filling the form holds the slot for 30 minutes, then sends the client to Stripe checkout.
+     ?plan=weekly|biweekly|monthly preselects a plan. */
+  (function () {
+    var API = "https://vanyans-plans.gordjalayan.workers.dev";
+    var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    var override = local ? new URLSearchParams(location.search).get('api') : null;
+    if (override) API = override;
+    var CALL = 'Call or text 818.660.5845 and we will set it up for you.';
+    var NAMES = { weekly: 'Weekly', biweekly: 'Every two weeks', monthly: 'Monthly' };
+    var CADENCE = { weekly: 'every week', biweekly: 'every two weeks', monthly: 'every four weeks' };
+    var $ = function (id) { return document.getElementById(id); };
+    var tabs = document.querySelectorAll('.rsv-tabs button');
+    var body = $('rsv-body'), form = $('rsv-form'), errEl = $('rsv-err'), go = $('rsv-go');
+    if (!body) return;
+    var state = { plan: null, days: [], dayIdx: 0, start: null, label: '' };
+    var started = false;
+
+    function say(text) { body.className = 'rsv-msg'; body.textContent = text; }
+    function fail(text) { errEl.textContent = text; errEl.hidden = false; go.disabled = false; go.textContent = 'Continue to checkout'; }
+    function call(path, opts) {
+      return fetch(API + path, opts).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, json: j }; });
+      });
+    }
+
+    function render() {
+      body.className = ''; body.innerHTML = '';
+      if (state.notice) {
+        var n = document.createElement('p'); n.className = 'rsv-err'; n.style.margin = '0 0 14px'; n.textContent = state.notice;
+        body.appendChild(n);
+      }
+      var days = document.createElement('div'); days.className = 'rsv-days';
+      state.days.forEach(function (d, i) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'rsv-day'; b.textContent = d.label;
+        b.setAttribute('aria-pressed', String(i === state.dayIdx));
+        b.addEventListener('click', function () { state.dayIdx = i; state.start = null; form.hidden = true; render(); });
+        days.appendChild(b);
+      });
+      body.appendChild(days);
+      var times = document.createElement('div'); times.className = 'rsv-times';
+      var day = state.days[state.dayIdx];
+      day.times.forEach(function (t) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'rsv-time'; b.textContent = t.label;
+        b.setAttribute('aria-pressed', String(t.start === state.start));
+        b.addEventListener('click', function () {
+          state.start = t.start; state.label = day.label + ' at ' + t.label;
+          $('rsv-sum').textContent = NAMES[state.plan] + ' plan. First visit ' + state.label + ', then ' + CADENCE[state.plan] + ' at the same time.';
+          form.hidden = false; errEl.hidden = true; render();
+          form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        times.appendChild(b);
+      });
+      body.appendChild(times);
+    }
+
+    function load(plan, notice) {
+      if (!NAMES[plan]) plan = 'weekly';
+      state.plan = plan; state.start = null; state.dayIdx = 0; form.hidden = true; state.notice = notice || '';
+      Array.prototype.forEach.call(tabs, function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-rplan') === plan)); });
+      if (!API) { say('Online scheduling is opening soon. ' + CALL); return; }
+      say('Loading open times…');
+      call('/api/slots?plan=' + plan).then(function (r) {
+        if (state.plan !== plan) return;
+        if (!r.ok) { say((r.json && r.json.error) || ('We could not load times. ' + CALL)); return; }
+        state.days = r.json.days || [];
+        state.sms = !!r.json.sms; // text reminders (and their consent box) exist only once Twilio is set up
+        $('rsv-sms-wrap').style.display = state.sms ? 'flex' : 'none';
+        if (!state.days.length) { say('No open times in the next three weeks. ' + CALL); return; }
+        render();
+      }).catch(function () { say('We could not load times. ' + CALL); });
+    }
+
+    Array.prototype.forEach.call(tabs, function (b) {
+      b.addEventListener('click', function () { load(b.getAttribute('data-rplan')); });
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errEl.hidden = true;
+      if (!state.start) { fail('Pick a day and time first.'); return; }
+      go.disabled = true; go.textContent = 'Holding your time…';
+      call('/api/hold', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plan: state.plan, start: state.start, name: $('rsv-name').value, email: $('rsv-email').value,
+          phone: $('rsv-phone').value, address: $('rsv-address').value, vehicle: $('rsv-vehicle').value,
+          smsConsent: state.sms ? $('rsv-sms').checked : false, website: $('rsv-hp').value })
+      }).then(function (r) {
+        if (r.ok && r.json.checkoutUrl) { go.textContent = 'Taking you to checkout…'; window.location.href = r.json.checkoutUrl; return; }
+        fail((r.json && r.json.error) || ('Something went wrong. ' + CALL));
+        if (r.status === 409) load(state.plan, (r.json && r.json.error) || 'That time was just taken. Please pick another.');
+      }).catch(function () { fail('We could not reach the scheduler. ' + CALL); });
+    });
+
+    function start() {
+      if (started) return;
+      var m = document.querySelector('main[data-page="reserve"]');
+      if (!m || m.hidden) return;
+      started = true;
+      var q = location.search || (location.hash.indexOf('?') > -1 ? location.hash.slice(location.hash.indexOf('?')) : '');
+      load(new URLSearchParams(q).get('plan') || 'weekly');
+    }
+    start();
+    window.addEventListener('hashchange', function () { setTimeout(start, 60); });
+  })();
+  </script>
+</main>
+
 <!-- ==================== PRIVACY POLICY ==================== -->
 <!-- ==================== TERMS AND TEXTING ==================== -->
 <footer>

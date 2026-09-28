@@ -1,0 +1,337 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Google Calendar plan tests</title>
+<script type="importmap">{ "imports": { "cloudflare:email": "./email-shim.js" } }</script>
+<pre id="out">running...</pre>
+<script type="module">
+/* Runs the Google Calendar plan visits in plans-worker.js against a fake Google Calendar, Stripe,
+   Twilio and Resend. Nothing real is called. */
+import { runAll, createHold, freeStarts, cleanupHolds, handleWebhook, verifyStripeSignature, sendReminders,
+  endPlans, seriesTimes, validateHold, zonedToUtc, localParts, fmt, resetBudget } from "./plans-worker.js";
+
+const H = 3600e3, D = 86400e3;
+const la = (y, m, d, hh, mm = 0) => zonedToUtc(y, m, d, hh, mm);
+const pad = (n) => String(n).padStart(2, "0");
+const localIso = (ms) => { const p = localParts(ms); return `${p.y}-${pad(p.m)}-${pad(p.d)}T${pad(p.hh)}:${pad(p.mm)}:00`; };
+const fromLocal = (s) => { const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); return zonedToUtc(+m[1], +m[2], +m[3], +m[4], +m[5]); };
+const stamp = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+
+function gworld(now) {
+  resetBudget();
+  const w = { now, stripe: {}, sms: [], clientMails: [], mails: [], kv: new Map(), fetches: 0, calCalls: 0, smsFail: false,
+    g: { events: [], seq: 0, extraBusy: [], cancelledInstances: new Set(), blind: false } };
+  w.env = {
+    GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "sec", GOOGLE_REFRESH_TOKEN: "rt", STRIPE_KEY: "rk", CAL_API_KEY: "cal",
+    STRIPE_WEBHOOK_SECRET: "whsec_test", TWILIO_SID: "AC1", TWILIO_TOKEN: "tk", TWILIO_FROM: "+18185550199", RESEND_KEY: "re_1",
+    DRY_RUN: "0",
+    STATE: { get: async (k) => w.kv.get(k) ?? null, put: async (k, v) => { w.kv.set(k, v); } },
+    MAILER: { send: async (m) => { w.mails.push(m.raw); } },
+  };
+  return w;
+}
+
+/* fake Google: expands recurring events the way Google does */
+function instances(w, ev, fromMs, toMs) {
+  const s0 = fromLocal(ev.start.dateTime), dur = fromLocal(ev.end.dateTime) - s0;
+  const rule = (ev.recurrence || [])[0] || "";
+  if (!rule) return [{ s: s0, e: s0 + dur, id: ev.id }].filter((x) => x.e > fromMs && x.s < toMs);
+  const interval = Number((rule.match(/INTERVAL=(\d+)/) || [])[1] || 1);
+  const u = rule.match(/UNTIL=(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/);
+  const until = u ? Date.parse(`${u[1]}-${u[2]}-${u[3]}T${u[4]}:${u[5]}:${u[6]}Z`) : Infinity;
+  const out = [];
+  for (const t of seriesTimes(s0, interval, Math.ceil((toMs - s0) / D) + 2)) {
+    const id = `${ev.id}_${stamp(t)}`;
+    if (t > until || t + dur <= fromMs || t >= toMs || w.g.cancelledInstances.has(id)) continue;
+    out.push({ s: t, e: t + dur, id });
+  }
+  return out;
+}
+const live = (w) => w.g.events.filter((e) => e.status !== "cancelled");
+const matches = (ev, filters) => filters.every((f) => { const [k, v] = f.split("="); return ev.extendedProperties?.private?.[k] === v; });
+
+function addEvent(w, { plan = "weekly", weeks = 1, start, status = "confirmed", email = "a@example.com", name = "Alex Doe", customer, id }) {
+  const ev = {
+    id: id || "v" + (++w.g.seq).toString(16).padStart(24, "0"), status: "confirmed", summary: `${status === "hold" ? "HOLD - " : ""}${plan} plan - ${name}`,
+    location: "1 Test St, Burbank, CA", start: { dateTime: localIso(start), timeZone: "America/Los_Angeles" },
+    end: { dateTime: localIso(start + 90 * 60e3), timeZone: "America/Los_Angeles" }, recurrence: [`RRULE:FREQ=WEEKLY;INTERVAL=${weeks}`],
+    created: new Date(w.now - 5 * D + w.g.seq * 1000).toISOString(),
+    extendedProperties: { private: { vanyans: "1", plan, status, name, email, phone: "+18185550100", vehicle: "Corvette", sms: "1",
+      holdAt: String(w.now), ...(customer ? { stripeCustomer: customer } : {}) } },
+  };
+  w.g.events.push(ev);
+  return ev;
+}
+
+function install(w) {
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = new URL(url);
+    const method = opts.method || "GET";
+    const reply = (obj, status = 200) => new Response(JSON.stringify(obj), { status });
+    w.fetches++;
+    if (u.host === "oauth2.googleapis.com") return reply({ access_token: "gtok", expires_in: 3600 });
+    if (u.host === "www.googleapis.com") {
+      const path = u.pathname.replace("/calendar/v3", "");
+      const body = opts.body ? JSON.parse(opts.body) : null;
+      if (path === "/freeBusy") {
+        const from = Date.parse(body.timeMin), to = Date.parse(body.timeMax);
+        const busy = w.g.blind ? [] : live(w).flatMap((e) => instances(w, e, from, to)).map((x) => ({ start: new Date(x.s).toISOString(), end: new Date(x.e).toISOString() }));
+        for (const b of w.g.extraBusy) busy.push({ start: new Date(b[0]).toISOString(), end: new Date(b[1]).toISOString() });
+        return reply({ calendars: { [body.items[0].id]: { busy } } });
+      }
+      const m = path.match(/^\/calendars\/[^/]+\/events(?:\/([^/]+))?$/);
+      if (m) {
+        const id = m[1];
+        if (!id && method === "POST") {
+          const ev = { ...body, status: "confirmed", created: new Date(w.now + (++w.g.seq) * 1000).toISOString() };
+          w.g.events.push(ev);
+          return reply(ev);
+        }
+        if (!id && method === "GET") {
+          const filters = u.searchParams.getAll("privateExtendedProperty");
+          if (u.searchParams.get("singleEvents") === "true") {
+            const from = Date.parse(u.searchParams.get("timeMin")), to = Date.parse(u.searchParams.get("timeMax"));
+            const items = live(w).filter((e) => matches(e, filters)).flatMap((e) => instances(w, e, from, to).map((x) => ({
+              id: x.id, status: "confirmed", summary: e.summary, location: e.location, created: e.created, extendedProperties: e.extendedProperties,
+              start: { dateTime: localIso(x.s) }, end: { dateTime: localIso(x.e) } })));
+            return reply({ items });
+          }
+          return reply({ items: live(w).filter((e) => matches(e, filters)) });
+        }
+        const ev = w.g.events.find((e) => e.id === id && e.status !== "cancelled");
+        if (!ev) return reply({ error: { code: 404, message: "Not Found" } }, 404);
+        if (method === "GET") return reply(ev);
+        if (method === "PATCH") { Object.assign(ev, body); return reply(ev); }
+        if (method === "DELETE") { ev.status = "cancelled"; return new Response(null, { status: 204 }); }
+      }
+    }
+    if (u.host === "api.twilio.com") {
+      const p = new URLSearchParams(opts.body);
+      if (w.smsFail) return reply({ code: 21610, message: "unsubscribed" }, 400);
+      w.sms.push({ to: p.get("To"), body: p.get("Body") });
+      return reply({ sid: "SM1" }, 201);
+    }
+    if (u.host === "api.resend.com") {
+      const b = JSON.parse(opts.body);
+      w.clientMails.push({ to: b.to[0], subject: b.subject, text: b.text });
+      return reply({ id: "em1" });
+    }
+    if (u.host === "api.cal.com") {
+      w.calCalls++;
+      return reply({ status: "success", data: [], pagination: { hasMore: false, nextCursor: null } });
+    }
+    if (u.host === "api.stripe.com") {
+      if (u.pathname === "/v1/customers/search") {
+        const email = u.searchParams.get("query").match(/'(.+)'/)[1].toLowerCase();
+        return reply({ data: w.stripe[email] ? [{ id: "cus_" + email }] : [] });
+      }
+      if (u.pathname === "/v1/subscriptions") {
+        const email = u.searchParams.get("customer").slice(4);
+        return reply({ data: (w.stripe[email] || []).map((s) => ({ status: s })) });
+      }
+    }
+    return reply({ error: "unmocked " + method + " " + url }, 500);
+  };
+}
+
+const results = [];
+function check(name, cond, detail) { results.push((cond ? "PASS  " : "FAIL  ") + name + (cond ? "" : "   -> " + JSON.stringify(detail))); }
+async function sign(raw, secret, tSec) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${tSec}.${raw}`));
+  return `t=${tSec},v1=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+const NOW = la(2026, 9, 30, 12);
+const input = (o = {}) => ({ plan: "weekly", start: new Date(la(2026, 10, 1, 9)).toISOString(), name: "Sam Rider", email: "sam@example.com",
+  phone: "(818) 555-0123", address: "10731 Cantara St, Sun Valley, CA", vehicle: "2023 Corvette C8", smsConsent: true, ...o });
+
+// P. offered first visits: 21 days x 14 half-hour starts, 17 h notice
+{
+  const w = gworld(NOW); install(w);
+  const s = await freeStarts(w.env, "weekly", NOW);
+  check("P offers 21 days x 14 starts", s.length === 294, s.length);
+  check("P first offer is Thu Oct 1, 9:00 AM (17 h notice)", fmt(s[0]) === "Thu, Oct 1, 9:00 AM", fmt(s[0]));
+  check("P last start of a day is 3:30 PM", fmt(s[13]) === "Thu, Oct 1, 3:30 PM", fmt(s[13]));
+}
+
+// Q. a never-ending biweekly Friday 9:00 series blocks a weekly Friday 9:00 but not a biweekly on the other weeks
+{
+  const w = gworld(NOW); install(w);
+  addEvent(w, { plan: "biweekly", weeks: 2, start: la(2026, 10, 2, 9) });
+  const weekly = (await freeStarts(w.env, "weekly", NOW)).map(fmt);
+  const biweekly = (await freeStarts(w.env, "biweekly", NOW)).map(fmt);
+  check("Q weekly Fri Oct 9 9:00 is blocked (clashes on Oct 16)", !weekly.includes("Fri, Oct 9, 9:00 AM"), null);
+  check("Q weekly Fri Oct 9 10:30 is blocked by the 30 min buffer", !weekly.includes("Fri, Oct 9, 10:30 AM"), null);
+  check("Q weekly Fri Oct 9 11:00 is fine", weekly.includes("Fri, Oct 9, 11:00 AM"), null);
+  check("Q biweekly Fri Oct 9 9:00 is fine (opposite weeks)", biweekly.includes("Fri, Oct 9, 9:00 AM"), null);
+  check("Q biweekly Fri Oct 16 9:00 is blocked", !biweekly.includes("Fri, Oct 16, 9:00 AM"), null);
+}
+
+// R. hold: a never-ending event that blocks the slot, and points at the right Stripe link
+{
+  const w = gworld(NOW); install(w);
+  const r = await createHold(w.env, input(), NOW);
+  const ev = w.g.events.find((e) => e.id === r.body.holdId);
+  check("R hold is accepted", r.status === 200 && !!ev, r);
+  check("R event never ends (no COUNT or UNTIL)", ev.recurrence[0] === "RRULE:FREQ=WEEKLY;INTERVAL=1", ev.recurrence);
+  check("R event is Thursday 9:00 AM Pacific and marked HOLD", ev.start.dateTime === "2026-10-01T09:00:00" && ev.start.timeZone === "America/Los_Angeles" && /^HOLD/.test(ev.summary), ev.start);
+  check("R checkout link carries the hold id and email", r.body.checkoutUrl.startsWith("https://buy.stripe.com/fZudR2d85220fgE3aIdnW02?client_reference_id=" + r.body.holdId) && /prefilled_email=sam%40example.com/.test(r.body.checkoutUrl), r.body.checkoutUrl);
+  const again = await createHold(w.env, input({ email: "other@example.com" }), NOW);
+  check("R the same slot cannot be held twice", again.status === 409, again);
+  const other = await createHold(w.env, input({ plan: "biweekly", start: new Date(la(2026, 10, 1, 9)).toISOString(), email: "b@example.com" }), NOW);
+  check("R even a biweekly at the same time is refused", other.status === 409, other);
+  const noConsent = await createHold(w.env, input({ smsConsent: false }), NOW);
+  const badPhone = await createHold(w.env, input({ phone: "12345" }), NOW);
+  const bot = await createHold(w.env, input({ website: "http://spam" }), NOW);
+  check("R needs text-reminder consent, a real phone, and no bot field", noConsent.status === 400 && badPhone.status === 400 && bot.status === 400, [noConsent.status, badPhone.status, bot.status]);
+  check("R a time that was never offered is refused", (await createHold(w.env, input({ start: new Date(la(2026, 10, 1, 20)).toISOString() }), NOW)).status === 409, null);
+}
+
+// S. holds expire after 30 minutes and the slot opens again
+{
+  const w = gworld(NOW); install(w);
+  const r = await createHold(w.env, input(), NOW);
+  check("S hold is live at 29 minutes", (await cleanupHolds(w.env, NOW + 29 * 60e3)) === 1 && w.g.events[0].status !== "cancelled", null);
+  check("S hold is released after 31 minutes", (await cleanupHolds(w.env, NOW + 31 * 60e3)) === 0 && w.g.events[0].status === "cancelled", w.g.events[0].status);
+  const again = await createHold(w.env, input({ email: "next@example.com" }), NOW + 31 * 60e3);
+  check("S the slot can be taken again", again.status === 200, again);
+}
+
+// S2. two people grab the same slot in the same moment: the earlier hold keeps it
+{
+  const w = gworld(NOW); install(w);
+  addEvent(w, { start: la(2026, 10, 1, 9), status: "hold", email: "first@example.com" });
+  w.g.blind = true; // the busy check does not see the earlier hold yet
+  const r = await createHold(w.env, input(), NOW);
+  check("S2 the later request loses and its hold is removed", r.status === 409 && w.g.events.filter((e) => e.status !== "cancelled").length === 1, [r.status, w.g.events.map((e) => e.status)]);
+}
+
+// T. Stripe webhook: confirms the hold, one email to the client, replays do nothing
+{
+  const w = gworld(NOW); install(w);
+  const r = await createHold(w.env, input(), NOW);
+  const raw = JSON.stringify({ type: "checkout.session.completed", data: { object: { id: "cs_1", client_reference_id: r.body.holdId,
+    payment_status: "no_payment_required", customer: "cus_sam@example.com", subscription: "sub_1", customer_details: { email: "sam@example.com" } } } });
+  const bad = await handleWebhook(w.env, raw, await sign(raw, "whsec_wrong", NOW / 1000 | 0), NOW + 60e3);
+  check("T wrong signature is rejected and nothing changes", bad.status === 400 && /^HOLD/.test(w.g.events[0].summary) && w.clientMails.length === 0, bad);
+  check("T old signature is rejected (replay protection)", (await handleWebhook(w.env, raw, await sign(raw, "whsec_test", (NOW - 3600e3) / 1000 | 0), NOW)).status === 400, null);
+  const ok = await handleWebhook(w.env, raw, await sign(raw, "whsec_test", (NOW + 60e3) / 1000 | 0), NOW + 60e3);
+  const pr = w.g.events[0].extendedProperties.private;
+  check("T good signature confirms the visit", ok.status === 200 && pr.status === "confirmed" && pr.stripeCustomer === "cus_sam@example.com" && !/^HOLD/.test(w.g.events[0].summary), [ok, pr]);
+  check("T the client gets exactly one confirmation email", w.clientMails.length === 1 && w.clientMails[0].to === "sam@example.com" && /Thu, Oct 1, 9:00 AM/.test(w.clientMails[0].text) && /24 hours/.test(w.clientMails[0].text), w.clientMails);
+  check("T owner is told about the new member", w.mails.length === 1 && /New plan member/.test(w.mails[0]), w.mails);
+  await handleWebhook(w.env, raw, await sign(raw, "whsec_test", (NOW + 90e3) / 1000 | 0), NOW + 90e3);
+  check("T Stripe retrying the same webhook sends no second email", w.clientMails.length === 1 && w.mails.length === 1, [w.clientMails.length, w.mails.length]);
+  const unrelated = JSON.stringify({ type: "checkout.session.completed", data: { object: { id: "cs_9", payment_status: "paid" } } });
+  check("T a purchase not made through the scheduler is ignored", (await handleWebhook(w.env, unrelated, await sign(unrelated, "whsec_test", (NOW + 60e3) / 1000 | 0), NOW + 60e3)).status === 200, null);
+}
+
+// T2. paid after the hold was released: owner is told, nothing is booked, no client email
+{
+  const w = gworld(NOW); install(w);
+  const r = await createHold(w.env, input(), NOW);
+  await cleanupHolds(w.env, NOW + 40 * 60e3);
+  const raw = JSON.stringify({ type: "checkout.session.completed", data: { object: { id: "cs_2", client_reference_id: r.body.holdId, payment_status: "paid", customer: "cus_x", customer_details: { email: "sam@example.com" } } } });
+  const res = await handleWebhook(w.env, raw, await sign(raw, "whsec_test", (NOW + 2400e3) / 1000 | 0), NOW + 2400e3);
+  check("T2 late payment: owner emailed, no client email", res.status === 200 && w.mails.length === 1 && /released/.test(w.mails[0]) && w.clientMails.length === 0, [res, w.mails.length]);
+}
+
+// U. plan ends: the series gets an end date, past visits stay
+{
+  const w = gworld(NOW); install(w);
+  w.stripe["gone@example.com"] = ["canceled"]; w.stripe["ok@example.com"] = ["active"]; w.stripe["late@example.com"] = ["past_due"];
+  const gone = addEvent(w, { start: la(2026, 10, 1, 9), email: "gone@example.com", name: "Gone", customer: "cus_gone@example.com" });
+  const ok = addEvent(w, { start: la(2026, 10, 1, 11), email: "ok@example.com", name: "Ok", customer: "cus_ok@example.com" });
+  const late = addEvent(w, { start: la(2026, 10, 1, 14), email: "late@example.com", name: "Late", customer: "cus_late@example.com" });
+  const report = { booked: [], cancelled: [], conflicts: [], warnings: [] };
+  await endPlans(w.env, NOW, false, report);
+  check("U ended plan gets UNTIL and status ended", /UNTIL=20260930T190000Z/.test(gone.recurrence[0]) && gone.extendedProperties.private.status === "ended", gone.recurrence);
+  check("U active and past_due plans are untouched", ok.recurrence[0] === "RRULE:FREQ=WEEKLY;INTERVAL=1" && late.recurrence[0] === "RRULE:FREQ=WEEKLY;INTERVAL=1", [ok.recurrence, late.recurrence]);
+  check("U no future visits remain for the ended plan", w.g.events && (await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&timeMin=" + new Date(NOW).toISOString() + "&timeMax=" + new Date(NOW + 60 * D).toISOString() + "&privateExtendedProperty=vanyans%3D1&privateExtendedProperty=status%3Dended").then((r) => r.json())).items.length === 0, null);
+  check("U owner report lists the ended plan", report.cancelled.length === 1 && /Gone/.test(report.cancelled[0].text), report.cancelled);
+  const before = w.fetches;
+  await endPlans(w.env, NOW + 10 * 60e3, false, { booked: [], cancelled: [], conflicts: [], warnings: [] });
+  check("U members are not re-checked within an hour (saves requests)", w.fetches - before <= 1, w.fetches - before);
+}
+
+// V. text reminders: once per visit, 24 h ahead, never for skipped or opted-out
+{
+  const w = gworld(la(2026, 9, 30, 9, 30)); install(w);
+  const rep = () => ({ booked: [], cancelled: [], conflicts: [], warnings: [] });
+  addEvent(w, { start: la(2026, 10, 1, 9), email: "r@example.com", name: "Rae" });
+  await sendReminders(w.env, w.now, false, rep());
+  check("V one text goes out within 24 h of the visit", w.sms.length === 1 && w.sms[0].to === "+18185550100" && /Thu, Oct 1, 9:00 AM/.test(w.sms[0].body) && /STOP/.test(w.sms[0].body), w.sms);
+  await sendReminders(w.env, w.now + 15 * 60e3, false, rep());
+  check("V the next cron run does not text again", w.sms.length === 1, w.sms.length);
+  const w2 = gworld(la(2026, 9, 30, 9, 30)); install(w2);
+  const ev = addEvent(w2, { start: la(2026, 10, 1, 9) });
+  w2.g.cancelledInstances.add(`${ev.id}_${stamp(la(2026, 10, 1, 9))}`);
+  await sendReminders(w2.env, w2.now, false, rep());
+  check("V a skipped visit gets no text", w2.sms.length === 0, w2.sms);
+  const w3 = gworld(la(2026, 9, 30, 9, 30)); install(w3);
+  addEvent(w3, { start: la(2026, 10, 2, 9) });
+  await sendReminders(w3.env, w3.now, false, rep());
+  check("V a visit more than 24 h away gets no text yet", w3.sms.length === 0, w3.sms);
+  check("V a visit 24 h away gets it later", (await sendReminders(w3.env, la(2026, 10, 1, 9, 5), false, rep()), w3.sms.length === 1), w3.sms);
+  const w4 = gworld(la(2026, 9, 30, 9, 30)); install(w4); w4.smsFail = true;
+  addEvent(w4, { start: la(2026, 10, 1, 9) });
+  const r4 = rep();
+  await sendReminders(w4.env, w4.now, false, r4);
+  check("V someone who replied STOP raises no alarm", r4.warnings.length === 0, r4.warnings);
+  const w5 = gworld(la(2026, 9, 30, 9, 30)); install(w5);
+  addEvent(w5, { start: la(2026, 10, 1, 9), status: "hold" });
+  await sendReminders(w5.env, w5.now, false, rep());
+  check("V unpaid holds never get texts", w5.sms.length === 0, w5.sms);
+  const w6 = gworld(la(2026, 9, 30, 9, 30)); install(w6);
+  addEvent(w6, { start: la(2026, 10, 1, 9) });
+  await sendReminders(w6.env, w6.now, true, rep());
+  check("V test mode sends nothing", w6.sms.length === 0, w6.sms);
+}
+
+// W. daylight saving ends Nov 1: visits stay at 9:00 AM local
+{
+  const t = seriesTimes(la(2026, 10, 30, 9), 1, 14);
+  check("W weekly Friday 9:00 AM before and after the clocks change", fmt(t[1]) === "Fri, Nov 6, 9:00 AM" && new Date(t[0]).toISOString() === "2026-10-30T16:00:00.000Z" && new Date(t[1]).toISOString() === "2026-11-06T17:00:00.000Z", t.map((x) => new Date(x).toISOString()));
+}
+
+// X. the scheduled run does Google first, then the old Cal.com sync unless it is switched off
+{
+  const w = gworld(NOW); install(w);
+  w.stripe["gone@example.com"] = ["canceled"];
+  const gone = addEvent(w, { start: la(2026, 10, 1, 9), email: "gone@example.com", customer: "cus_gone@example.com" });
+  await runAll(w.env, NOW);
+  check("X scheduled run ends the plan and still runs the Cal.com sync", /UNTIL=/.test(gone.recurrence[0]) && w.calCalls >= 1, [gone.recurrence, w.calCalls]);
+  const w2 = gworld(NOW); install(w2); w2.env.CAL_SYNC = "0";
+  await runAll(w2.env, NOW);
+  check("X CAL_SYNC=0 skips Cal.com entirely", w2.calCalls === 0, w2.calCalls);
+  const w3 = gworld(NOW); install(w3); delete w3.env.GOOGLE_REFRESH_TOKEN;
+  await runAll(w3.env, NOW);
+  check("X without Google keys the old Cal.com sync still runs", w3.calCalls >= 1 && w3.fetches === w3.calCalls, [w3.calCalls, w3.fetches]);
+}
+
+// Y. input checks
+{
+  check("Y phone with country code is accepted", validateHold(input({ phone: "+1 818-555-0123" })).value?.phone === "+18185550123", validateHold(input({ phone: "+1 818-555-0123" })));
+  check("Y bad email and unknown plan are rejected", !!validateHold(input({ email: "nope" })).error && !!validateHold(input({ plan: "daily" })).error, null);
+  check("Y signature check refuses an empty secret", (await verifyStripeSignature("x", "t=1,v1=00", "", 1)) === false, null);
+}
+
+// Z. Twilio not set up yet: no consent box, no promise of texts, no texts
+{
+  const w = gworld(NOW); install(w);
+  delete w.env.TWILIO_SID; delete w.env.TWILIO_TOKEN; delete w.env.TWILIO_FROM;
+  const r = await createHold(w.env, input({ smsConsent: false }), NOW);
+  const ev = w.g.events.find((e) => e.id === r.body.holdId);
+  check("Z without texting, no consent is needed", r.status === 200 && ev.extendedProperties.private.sms === "0", r);
+  const raw = JSON.stringify({ type: "checkout.session.completed", data: { object: { id: "cs_z", client_reference_id: r.body.holdId, payment_status: "paid", customer: "cus_sam@example.com" } } });
+  await handleWebhook(w.env, raw, await sign(raw, "whsec_test", (NOW + 60e3) / 1000 | 0), NOW + 60e3);
+  check("Z the confirmation email does not promise texts", w.clientMails.length === 1 && !/text you|STOP/.test(w.clientMails[0].text) && /repeats automatically/.test(w.clientMails[0].text), w.clientMails);
+  await runAll(w.env, la(2026, 9, 30, 9, 30));
+  check("Z the scheduled run sends no texts and no owner alert about it", w.sms.length === 0 && !w.mails.some((m) => /Text reminders/.test(m)), [w.sms.length, w.mails.length]);
+  const w2 = gworld(NOW); install(w2);
+  const r2 = await createHold(w2.env, input({ smsConsent: true }), NOW);
+  check("Z with texting on, consent is recorded", r2.status === 200 && w2.g.events[0].extendedProperties.private.sms === "1", r2);
+}
+
+const pass = results.filter((r) => r.startsWith("PASS")).length;
+document.getElementById("out").textContent = `${pass}/${results.length} passed\n\n` + results.join("\n");
+</script>

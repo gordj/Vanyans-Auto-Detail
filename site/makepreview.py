@@ -36,6 +36,7 @@ FALLBACKS = {
     "SQ_MONTHLY": TEXT.format("monthly"),
     "SQ_BIWEEKLY": TEXT.format("every%20two%20weeks"),
     "SQ_WEEKLY": TEXT.format("weekly"),
+    "API_BASE": "",
     "SQ_MEMBER": (
         '<div class="sq-fallback"><p>Your plan is active. '
         'Call or text <a href="tel:+18186605845">818.660.5845</a> '
@@ -84,6 +85,7 @@ def square_values():
     if cal.get("link"):
         got["SQ_EMBED"] = embed.replace("__CALLINK__", cal["link"]).replace("__NS__", "book")
     got["CAL_PLAN_BASE"] = (cal.get("memberLink") or "vanyans-auto.detail/plan-{plan}").replace("{plan}", "")
+    got["API_BASE"] = (cfg.get("booking") or {}).get("apiBase")
     if cal.get("memberLink"):
         got["SQ_MEMBER"] = embed.replace("__CALLINK__", cal["memberLink"]).replace("__NS__", "member")
 

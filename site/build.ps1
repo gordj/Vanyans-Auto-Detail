@@ -76,6 +76,22 @@ $pages = [ordered]@{
     title = "About Vanyan's Auto Detail, Burbank"
     desc  = 'Fifteen years of detailing, from a shop in Yerevan to a fully mobile operation in Los Angeles.'
   }
+  privacy = @{
+    file  = 'privacy.html'
+    title = "Privacy Policy | Vanyan's Auto Detail"
+    desc  = "How Vanyan's Auto Detail collects, uses and protects your information, including appointment reminder texts."
+  }
+  terms = @{
+    file  = 'terms.html'
+    title = "Terms & Text Messaging | Vanyan's Auto Detail"
+    desc  = "Terms for Vanyan's Auto Detail maintenance plans and appointment reminder text messages."
+  }
+  reserve = @{
+    file    = 'reserve.html'
+    title   = "Reserve Your Plan Time | Vanyan's Auto Detail"
+    desc    = 'Pick the day and time for your maintenance plan. Your visit repeats automatically.'
+    noindex = $true
+  }
   welcome = @{
     file    = 'welcome.html'
     title   = "You are enrolled | Vanyan's Auto Detail"
@@ -111,6 +127,8 @@ $src = $src.Replace('{{SQ_EMBED}}',    $SQ_EMBED)
 $src = $src.Replace('{{SQ_MEMBER}}',   $SQ_MEMBER)
 $CAL_PLAN_BASE = if ($sq.cal -and $sq.cal.memberLink) { $sq.cal.memberLink.Replace('{plan}', '') } else { 'vanyans-auto.detail/plan-' }
 $src = $src.Replace('{{CAL_PLAN_BASE}}', $CAL_PLAN_BASE)
+$API_BASE = if ($sq.booking -and $sq.booking.apiBase) { $sq.booking.apiBase } else { '' }
+$src = $src.Replace('{{API_BASE}}', $API_BASE)
 $src = $src.Replace('{{SQ_BOOK}}',     $SQ_BOOK)
 $src = $src.Replace('{{SQ_MONTHLY}}',  $SQ_MONTHLY)
 $src = $src.Replace('{{SQ_BIWEEKLY}}', $SQ_BIWEEKLY)
