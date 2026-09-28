@@ -22,8 +22,9 @@
  *   CAL_API_KEY   secret   Cal.com > Settings > Developer > API keys
  *   STRIPE_KEY    secret   Stripe restricted key: Customers Read, Subscriptions Read
  *   DRY_RUN       text     "1" = report only, change nothing (default). "0" = live.
- *   STATE         KV       remembers the last run and which alerts were already sent
+ *   STATE         KV       remembers the last run, each member's standing slot, and which alerts were sent
  *   MAILER        email    send_email binding, destination vanyansdetailing@gmail.com
+ *   BUDGET        text     optional. Outside requests per run, default 40. Use 900 on Workers Paid.
  */
 import { EmailMessage } from "cloudflare:email";
 
@@ -42,6 +43,19 @@ const LIVE = new Set(["active", "trialing", "past_due"]);        // past_due: St
 const ENDED = new Set(["canceled", "unpaid", "incomplete_expired"]);
 const OWNER = "vanyansdetailing@gmail.com";
 const SENDER = "plans@vanyansautodetail.com";
+const LOOKBACK_MS = 14 * 86400e3;    // after the first run, only read bookings from the last 2 weeks on
+const STALE_MS = 6 * 3600e3;         // warn if a member has gone this long without being checked
+const DEFAULT_BUDGET = 40;           // outside requests per run (Workers Free allows 50)
+
+// Outside requests (Cal.com + Stripe) made by the current run. When the budget is spent the run
+// stops cleanly and the members it did not reach go first next time.
+let used = 0;
+let budget = DEFAULT_BUDGET;
+class BudgetError extends Error {}
+function spend() {
+  if (used >= budget) throw new BudgetError("request budget used up");
+  used++;
+}
 
 export default {
   async scheduled(event, env, ctx) {
@@ -59,10 +73,18 @@ export default {
 
 export async function run(env, now = Date.now()) {
   const dry = env.DRY_RUN !== "0";
-  const report = { at: new Date(now).toISOString(), dry, members: 0, booked: [], cancelled: [], conflicts: [], warnings: [] };
+  used = 0;
+  budget = Number(env.BUDGET) || DEFAULT_BUDGET;
+  const report = { at: new Date(now).toISOString(), dry, members: 0, deferred: 0, booked: [], cancelled: [], conflicts: [], warnings: [] };
   try {
     if (!env.CAL_API_KEY || !env.STRIPE_KEY) throw new Error("CAL_API_KEY or STRIPE_KEY is not set");
-    const bookings = await listPlanBookings(env);
+    const known = new Set(await kvJson(env, "members", []));
+    const knownBefore = JSON.stringify([...known].sort());
+    const checked = await kvJson(env, "checked", {});
+    const firstRun = !(await kvGet(env, "bootstrapped"));
+    // First run reads all history once to learn every member's standing slot. After that, only recent
+    // bookings are read; standing slots come from KV, so the read never grows with the years.
+    const bookings = await listPlanBookings(env, firstRun ? null : now - LOOKBACK_MS, report);
     const byEmail = new Map();
     for (const b of bookings) {
       const email = String(b.attendees?.[0]?.email || "").toLowerCase();
@@ -70,13 +92,31 @@ export async function run(env, now = Date.now()) {
       if (!byEmail.has(email)) byEmail.set(email, []);
       byEmail.get(email).push(b);
     }
-    for (const [email, list] of byEmail) {
+    const emails = [...new Set([...byEmail.keys(), ...known])];
+    emails.sort((a, b) => (checked[a] || 0) - (checked[b] || 0)); // least recently checked first
+    let stopped = false;
+    for (const email of emails) {
       report.members++;
+      if (stopped) { report.deferred++; continue; }
       try {
-        await syncMember(env, email, list, now, dry, report);
+        await syncMember(env, email, byEmail.get(email) || [], now, dry, report, known);
+        checked[email] = now;
       } catch (e) {
+        if (e instanceof BudgetError) { stopped = true; report.deferred++; continue; }
         report.warnings.push(item(`error:${email}:${now}`, `${email}: ${errText(e)}`));
       }
+    }
+    for (const email of emails) {
+      if (checked[email] && now - checked[email] > STALE_MS && known.has(email)) {
+        report.warnings.push(item(`stale:${email}`,
+          `${email} has not been checked for over 6 hours (too many members for one run). ` +
+          `Set BUDGET higher (Workers Paid) or check the worker.`));
+      }
+    }
+    if (!dry) {
+      if (JSON.stringify([...known].sort()) !== knownBefore) await kvPut(env, "members", [...known]);
+      await kvPut(env, "checked", checked);
+      if (firstRun && !stopped && !report.warnings.some((w) => w.key === "truncated")) await kvPut(env, "bootstrapped", "1");
     }
   } catch (e) {
     report.error = errText(e);
@@ -86,7 +126,32 @@ export async function run(env, now = Date.now()) {
   return report;
 }
 
-async function syncMember(env, email, list, now, dry, report) {
+/**
+ * The member's standing slot: their newest own booking (not one this worker made, and not a
+ * visit they merely moved). It is remembered in KV, so cancelling that booking, or the history
+ * scrolling out of the recent-bookings window, never erases it.
+ */
+async function standingSlot(env, email, list) {
+  const stored = await kvJson(env, "anchor:" + email, null);
+  const top = list
+    .filter((b) => !isAuto(b) && !b.rescheduledFromUid && isLive(b))
+    .sort((a, b) => Date.parse(b.createdAt || b.start) - Date.parse(a.createdAt || a.start))[0];
+  if (top && (!stored || Date.parse(top.createdAt || top.start) > Date.parse(stored.createdAt))) {
+    const a = top.attendees?.[0] || {};
+    return {
+      fresh: true,
+      slot: {
+        uid: top.uid, typeId: eventTypeId(top), start: top.start, createdAt: top.createdAt || top.start,
+        email, name: a.name || "Member", tz: a.timeZone || TZ,
+        phone: a.phoneNumber || top.bookingFieldsResponses?.attendeePhoneNumber || null,
+        address: addressOf(top),
+      },
+    };
+  }
+  return { fresh: false, slot: stored };
+}
+
+async function syncMember(env, email, list, now, dry, report, known) {
   const status = await stripeStatus(env, email);
   if (status === "none") {
     report.warnings.push(item(`nostripe:${email}`,
@@ -103,21 +168,23 @@ async function syncMember(env, email, list, now, dry, report) {
       if (!dry) await calCancel(env, b.uid, "Maintenance plan ended");
       report.cancelled.push(item(`cancel:${b.uid}`, `${email}: removed ${fmt(Date.parse(b.start))} (plan ended)`));
     }
+    known.delete(email); // nothing left to look after; stops paying Stripe requests for old members
     return;
   }
 
   // live plan
-  const anchor = list
-    .filter((b) => !isAuto(b) && isLive(b))
-    .sort((a, b) => Date.parse(b.createdAt || b.start) - Date.parse(a.createdAt || a.start))[0];
-  if (!anchor) return; // they cancelled their own booking: keep what exists, don't invent a slot
-  const plan = PLANS[eventTypeId(anchor)];
+  const { fresh, slot: anchor } = await standingSlot(env, email, list);
+  if (!anchor) return; // no slot known and none to learn from: don't invent one
+  const plan = PLANS[anchor.typeId];
   if (!plan) return;
+  if (fresh && !dry) await kvPut(env, "anchor:" + email, anchor); // written only when it changes
+  known.add(email);
 
   const series = occurrences(Date.parse(anchor.start), plan.weeks, now);
 
-  // automated visits that no longer line up with the member's current slot (they picked a new one)
-  for (const b of future.filter(isAuto)) {
+  // automated visits that no longer line up with the member's current slot (they picked a new one).
+  // A visit the member moved themselves is left alone.
+  for (const b of future.filter((x) => isAuto(x) && !x.rescheduledFromUid)) {
     const t = Date.parse(b.start);
     if (!series.all.some((s) => Math.abs(s - t) < SAME_SLOT_MS)) {
       if (!dry) await calCancel(env, b.uid, "Standing slot changed");
@@ -128,7 +195,7 @@ async function syncMember(env, email, list, now, dry, report) {
   for (const t of series.targets) {
     const handled = list.some((b) => Math.abs(Date.parse(b.start) - t) < SAME_SLOT_MS);
     if (handled) continue; // booked already, or cancelled/moved by the member: leave it
-    const free = await calSlotFree(env, eventTypeId(anchor), t);
+    const free = await calSlotFree(env, anchor.typeId, t);
     if (!free) {
       report.conflicts.push(item(`conflict:${email}:${t}`,
         `${email} (${plan.name}): ${fmt(t)} is already taken, so it was NOT booked. ` +
@@ -195,6 +262,7 @@ export function fmt(ms) {
 /* ------------------------------------------------------------------ Cal.com */
 
 async function cal(env, path, { method = "GET", body, version }) {
+  spend();
   const res = await fetch(CAL + path, {
     method,
     headers: {
@@ -212,18 +280,27 @@ async function cal(env, path, { method = "GET", body, version }) {
   return json;
 }
 
-async function listPlanBookings(env) {
+async function listPlanBookings(env, afterMs, report) {
   const ids = Object.keys(PLANS).join(",");
   const out = [];
   let cursor = null;
-  for (let page = 0; page < 50; page++) {
-    const q = `/bookings?eventTypeIds=${ids}&limit=100` + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : "");
+  let more = false;
+  const PAGES = 20; // 2,000 bookings; the recent-only read stays far below this
+  for (let page = 0; page < PAGES; page++) {
+    const q = `/bookings?eventTypeIds=${ids}&limit=100` +
+      (afterMs ? `&afterStart=${encodeURIComponent(new Date(afterMs).toISOString())}` : "") +
+      (cursor ? `&cursor=${encodeURIComponent(cursor)}` : "");
     const j = await cal(env, q, { version: "2026-05-01" });
     const rows = Array.isArray(j.data) ? j.data : (j.data?.bookings || []);
     out.push(...rows);
     const p = j.pagination || j.data?.pagination || j;
     cursor = p.nextCursor || null;
-    if (!cursor || p.hasMore === false || !rows.length) break;
+    more = !!cursor && p.hasMore !== false && rows.length > 0;
+    if (!more) break;
+  }
+  if (more) {
+    report.warnings.push(item("truncated",
+      "The plan booking list hit its size limit, so some bookings were not read. Tell your developer."));
   }
   return out;
 }
@@ -244,20 +321,17 @@ async function calSlotFree(env, typeId, t) {
 }
 
 async function calBook(env, anchor, t) {
-  const a = anchor.attendees?.[0] || {};
-  const phone = a.phoneNumber || anchor.bookingFieldsResponses?.attendeePhoneNumber;
   const body = {
     start: new Date(t).toISOString(),
-    eventTypeId: eventTypeId(anchor),
-    attendee: { name: a.name || "Member", email: a.email, timeZone: a.timeZone || TZ, language: "en" },
+    eventTypeId: anchor.typeId,
+    attendee: { name: anchor.name || "Member", email: anchor.email, timeZone: anchor.tz || TZ, language: "en" },
     metadata: { auto: "1", anchor: String(anchor.uid) },
   };
-  if (phone) {
-    body.attendee.phoneNumber = phone;
-    body.bookingFieldsResponses = { attendeePhoneNumber: phone };
+  if (anchor.phone) {
+    body.attendee.phoneNumber = anchor.phone;
+    body.bookingFieldsResponses = { attendeePhoneNumber: anchor.phone };
   }
-  const address = addressOf(anchor);
-  if (address) body.location = { type: "attendeeAddress", address };
+  if (anchor.address) body.location = { type: "attendeeAddress", address: anchor.address };
   await cal(env, "/bookings", { method: "POST", body, version: "2026-02-25" });
 }
 
@@ -282,6 +356,7 @@ function addressOf(b) {
 /* ------------------------------------------------------------------ Stripe */
 
 async function stripe(env, path) {
+  spend();
   const res = await fetch("https://api.stripe.com" + path, { headers: { authorization: `Bearer ${env.STRIPE_KEY}` } });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`Stripe ${path.split("?")[0]} failed (${res.status}): ${json.error?.message || ""}`);
@@ -309,12 +384,24 @@ async function stripeStatus(env, email) {
 /* ------------------------------------------------------------------ reporting */
 
 const item = (key, text) => ({ key, text });
+
+async function kvGet(env, key) {
+  return env.STATE ? await env.STATE.get(key) : null;
+}
+async function kvPut(env, key, value) {
+  if (env.STATE) await env.STATE.put(key, typeof value === "string" ? value : JSON.stringify(value));
+}
+async function kvJson(env, key, fallback) {
+  const s = await kvGet(env, key);
+  if (!s) return fallback;
+  try { return JSON.parse(s); } catch { return fallback; }
+}
 const errText = (e) => String((e && e.message) || e).slice(0, 400);
 
 function publicReport(r) {
   const mask = (s) => s.replace(/([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@/g, "$1***@");
   const m = (list) => list.map((x) => mask(x.text));
-  return { at: r.at, dry: r.dry, members: r.members, booked: m(r.booked), cancelled: m(r.cancelled),
+  return { at: r.at, dry: r.dry, members: r.members, deferred: r.deferred, booked: m(r.booked), cancelled: m(r.cancelled),
     conflicts: m(r.conflicts), warnings: m(r.warnings), error: r.error || null };
 }
 

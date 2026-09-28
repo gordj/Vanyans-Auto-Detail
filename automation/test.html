@@ -11,7 +11,7 @@ const WEEKLY = 7208693, BIWEEKLY = 7208694;
 const H = 3600e3, D = 86400e3;
 
 function world() {
-  const w = { bookings: [], stripe: {}, busy: [], calls: [], mails: [], now: 0, seq: 1 };
+  const w = { bookings: [], stripe: {}, busy: [], calls: [], mails: [], now: 0, seq: 1, listCalls: [], fetches: 0 };
   w.kv = new Map();
   w.env = {
     CAL_API_KEY: "cal_test", STRIPE_KEY: "rk_test", DRY_RUN: "0",
@@ -20,8 +20,9 @@ function world() {
   };
   return w;
 }
-function book(w, { email, start, type = WEEKLY, auto = false, status = "accepted", created }) {
+function book(w, { email, start, type = WEEKLY, auto = false, status = "accepted", created, movedFrom }) {
   const b = { uid: "b" + w.seq++, start: new Date(start).toISOString(), status, eventType: { id: type },
+    ...(movedFrom ? { rescheduledFromUid: movedFrom } : {}),
     createdAt: new Date(created ?? w.now - D).toISOString(),
     attendees: [{ email, name: "Test Member", timeZone: "America/Los_Angeles", phoneNumber: "+18185550100" }],
     location: "10731 Cantara St, Sun Valley, CA", metadata: auto ? { auto: "1" } : {} };
@@ -36,10 +37,18 @@ function install(w) {
     const method = opts.method || "GET";
     const body = opts.body ? JSON.parse(opts.body) : null;
     const reply = (obj, status = 200) => new Response(JSON.stringify(obj), { status });
+    w.fetches++;
     if (u.host === "api.cal.com") {
       if (method === "GET" && u.pathname === "/v2/bookings") {
         const ids = (u.searchParams.get("eventTypeIds") || "").split(",").map(Number);
-        return reply({ status: "success", data: w.bookings.filter((b) => ids.includes(b.eventType.id)), pagination: { hasMore: false, nextCursor: null } });
+        const after = u.searchParams.get("afterStart");
+        const limit = Number(u.searchParams.get("limit") || 100);
+        const offset = Number(u.searchParams.get("cursor") || 0);
+        let rows = w.bookings.filter((b) => ids.includes(b.eventType.id));
+        if (after) rows = rows.filter((b) => Date.parse(b.start) >= Date.parse(after));
+        w.listCalls.push({ after: !!after, offset });
+        const more = offset + limit < rows.length;
+        return reply({ status: "success", data: rows.slice(offset, offset + limit), pagination: { hasMore: more, nextCursor: more ? String(offset + limit) : null } });
       }
       if (method === "GET" && u.pathname === "/v2/slots") {
         const from = Date.parse(u.searchParams.get("start")), to = Date.parse(u.searchParams.get("end")) + D;
@@ -177,6 +186,87 @@ function check(name, cond, detail) { results.push((cond ? "PASS  " : "FAIL  ") +
   book(w, { email: "pat@example.com", start: la(2026, 10, 6, 10) });
   await run(w.env, w.now);
   check("J past_due still counts as a live plan", w.calls.filter((c) => c[0] === "book").length === 4 && !w.calls.some((c) => c[0] === "cancel"), w.calls);
+}
+
+const autoCount = (w, email) => w.bookings.filter((b) => b.attendees[0].email === email && b.metadata.auto === "1" && b.status === "accepted").length;
+
+// K. member cancels their own first booking: their standing slot is remembered and the series carries on
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.stripe["kim@example.com"] = ["active"];
+  const first = book(w, { email: "kim@example.com", start: la(2026, 10, 6, 10) });
+  await run(w.env, w.now);
+  first.status = "cancelled";
+  w.calls = [];
+  await run(w.env, la(2026, 10, 7, 12));
+  const booked = w.calls.filter((c) => c[0] === "book").map((c) => fmt(Date.parse(c[1])));
+  check("K cancelling the first booking still adds Nov 10", JSON.stringify(booked) === JSON.stringify(["Tue, Nov 10, 10:00 AM"]), booked);
+  check("K nothing is cancelled", !w.calls.some((c) => c[0] === "cancel"), w.calls);
+}
+
+// L. member moves single visits (the original is cancelled, a new booking points back at it):
+//    the move is left alone and does not change their weekday
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.stripe["lee@example.com"] = ["active"];
+  book(w, { email: "lee@example.com", start: la(2026, 10, 6, 10) });
+  await run(w.env, w.now);
+  const o20 = w.bookings.find((b) => fmt(Date.parse(b.start)) === "Tue, Oct 20, 10:00 AM");
+  const o27 = w.bookings.find((b) => fmt(Date.parse(b.start)) === "Tue, Oct 27, 10:00 AM");
+  o20.status = "cancelled"; o27.status = "cancelled";
+  const m1 = book(w, { email: "lee@example.com", start: la(2026, 10, 22, 15), auto: true, created: w.now + H, movedFrom: o20.uid });
+  const m2 = book(w, { email: "lee@example.com", start: la(2026, 10, 29, 15), auto: false, created: w.now + H, movedFrom: o27.uid });
+  w.calls = [];
+  await run(w.env, w.now + 2 * H);
+  check("L moved visits are not cancelled", m1.status === "accepted" && m2.status === "accepted" && !w.calls.some((c) => c[0] === "cancel"), w.calls);
+  check("L moving a visit does not re-book it or change the weekday", w.calls.length === 0, w.calls);
+}
+
+// M. years of old history do not affect a run: only recent bookings are read
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.stripe["pia@example.com"] = ["active"];
+  book(w, { email: "pia@example.com", start: la(2026, 10, 6, 10) });
+  await run(w.env, w.now);
+  for (let i = 0; i < 6000; i++) book(w, { email: "old@example.com", start: la(2026, 1, 5, 10) + (i % 50) * D, created: la(2025, 12, 1, 10) });
+  w.calls = []; w.mails = []; w.listCalls = []; w.fetches = 0;
+  const r = await run(w.env, la(2026, 10, 7, 12));
+  const booked = w.calls.filter((c) => c[0] === "book").map((c) => fmt(Date.parse(c[1])));
+  check("M only one recent-bookings page is read", w.listCalls.length === 1 && w.listCalls[0].after === true, w.listCalls);
+  check("M old history is ignored and Nov 10 is added", r.members === 1 && JSON.stringify(booked) === JSON.stringify(["Tue, Nov 10, 10:00 AM"]) && r.warnings.length === 0, { members: r.members, booked, warnings: r.warnings });
+}
+
+// N. more members than one run can handle: the run stops cleanly, everyone is done within a few runs
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.env.BUDGET = "14";
+  const emails = ["a", "b", "c", "d", "e"].map((x) => x + "@example.com");
+  emails.forEach((e, i) => { w.stripe[e] = ["active"]; book(w, { email: e, start: la(2026, 10, 6 + i, 10) }); });
+  // Tue/Wed first visits have 4 more visits in the 5-week window, Thu/Fri/Sat have 3
+  const expected = [4, 4, 3, 3, 3];
+  const counts = () => emails.map((e) => autoCount(w, e));
+  let maxFetch = 0, runs = 0;
+  for (; runs < 12; runs++) {
+    w.fetches = 0;
+    await run(w.env, w.now);
+    maxFetch = Math.max(maxFetch, w.fetches);
+    if (JSON.stringify(counts()) === JSON.stringify(expected)) break;
+  }
+  check("N no run exceeds the request budget", maxFetch <= 14, maxFetch);
+  check("N every member ends fully booked within a few runs", runs < 12, { runs, counts: counts() });
+  await run(w.env, w.now);
+  check("N nobody is double-booked", JSON.stringify(counts()) === JSON.stringify(expected), counts());
+}
+
+// O. more history than the first-run scan can read: the owner is told, nothing is silently dropped
+{
+  const w = world(); w.now = la(2026, 9, 30, 12); install(w);
+  w.stripe["ole@example.com"] = ["active"];
+  book(w, { email: "ole@example.com", start: la(2026, 10, 6, 10) });
+  for (let i = 0; i < 2100; i++) book(w, { email: "old@example.com", start: la(2026, 1, 5, 10) + (i % 50) * D, created: la(2025, 12, 1, 10) });
+  const r = await run(w.env, w.now);
+  check("O the size limit is reported to the owner", r.warnings.some((x) => /size limit/.test(x.text)) && w.mails.some((m) => /Heads up/.test(m)), { warnings: r.warnings, mails: w.mails.length });
+  check("O first-run scan is repeated next time (not marked done)", !w.kv.get("bootstrapped"), w.kv.get("bootstrapped"));
 }
 
 const pass = results.filter((r) => r.startsWith("PASS")).length;
