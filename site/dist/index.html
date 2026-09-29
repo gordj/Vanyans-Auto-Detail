@@ -119,8 +119,11 @@ section{padding:76px 0}
 @media(max-width:1040px){.cards.four{grid-template-columns:repeat(2,1fr); gap:16px}}
 @media(max-width:880px){.cards{grid-template-columns:1fr}}
 @media(max-width:620px){.cards.four{grid-template-columns:1fr}}
-.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:26px; display:flex; flex-direction:column; gap:10px}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:26px; display:flex; flex-direction:column; gap:10px;
+  text-decoration:none; transition:transform .16s, box-shadow .16s, border-color .16s}
+a.card:hover{transform:translateY(-4px); box-shadow:0 20px 44px -24px rgba(20,26,34,.34); border-color:var(--muted)}
 .card.lead{border-color:var(--accent-line); background:linear-gradient(180deg, var(--accent-dim), var(--surface) 60%)}
+a.card.lead:hover{border-color:var(--accent)}
 .card h3{font-size:19px}
 .card p{color:var(--muted); font-size:14.5px}
 .card .from{font-family:var(--mono); font-size:12px; color:var(--muted); letter-spacing:.06em; margin-top:auto; padding-top:14px}
@@ -1107,25 +1110,25 @@ footer .wrap{position:relative; display:block}
           Every price is out the door with nothing added later.</p>
       </div>
       <div class="cards">
-        <div class="card">
+        <a class="card" href="/services?tab=full">
           <h3>Full Detail</h3>
           <p>Inside vacuumed and wiped down, outside hand washed and waxed. The one that keeps a car
             from ever getting bad.</p>
           <span class="from">From<b>$185</b></span>
-        </div>
-        <div class="card lead">
+        </a>
+        <a class="card lead" href="/services?tab=full">
           <span class="badge">Most booked</span>
           <h3>Premium Detail</h3>
           <p>Double vacuum with the seats moved, stains treated properly, plastics protected, rims
             detailed and a spot polish where the paint needs it.</p>
           <span class="from">From<b>$265</b></span>
-        </div>
-        <div class="card">
+        </a>
+        <a class="card" href="/services?tab=full">
           <h3>Signature Detail</h3>
           <p>Clay bar over the whole car, paint enhancement polish, everything dressed. This is the one
             we end up photographing.</p>
           <span class="from">From<b>$385</b></span>
-        </div>
+        </a>
       </div>
       <div style="margin-top:30px">
         <a class="lux-link" href="/services">Full pricing</a>
