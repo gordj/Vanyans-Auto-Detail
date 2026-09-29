@@ -1662,6 +1662,20 @@ footer .wrap{position:relative; display:block}
           note:'inside only',
           list:['Mold treated and removed','Seats and carpets shampooed','Ozone treatment for the smell',
                 'Double vacuum, seats moved','Every surface wiped and protected','Mats, trunk, windows'] }
+      ],
+      polish: [
+        { name:'1-Step Polish', badge:'Refresh', price:250, from:true, tone:'a',
+          note:'3–5 hours',
+          list:['Mini detail included','Hand wash and clay bar decontamination','Single-stage machine polish',
+                'Removes light swirls and haze','Brings back gloss and clarity'] },
+        { name:'2-Step Polish', badge:'Most popular', price:500, from:true, tone:'b', pop:true,
+          note:'6–8 hours',
+          list:['Mini detail included','Hand wash and clay bar decontamination','Compound stage cuts deeper scratches and oxidation',
+                'Finishing polish for maximum clarity','Paint corrected panel by panel'] },
+        { name:'3-Step Polish', badge:'V.I.P.', price:900, from:true, tone:'c',
+          note:'10–20 hours',
+          list:['Mini detail included','Hand wash and clay bar decontamination','Heavy cut, compound and finishing stages',
+                'Corrects heavy swirls, scratches and oxidation','Best clarity and gloss the paint can hold'] }
       ]
     };
 
@@ -1681,7 +1695,7 @@ footer .wrap{position:relative; display:block}
           '</div>';
         card.querySelector('.tier-badge').textContent = t.badge;
         card.querySelector('.tier-head h3').textContent = t.name;
-        card.querySelector('.tier-price b').textContent = '$' + t.price;
+        card.querySelector('.tier-price b').textContent = (t.from ? 'From $' : '$') + t.price;
         card.querySelector('.tier-price em').textContent = t.note;
         var spans = card.querySelectorAll('.tier-list span');
         t.list.forEach(function(l, i){ spans[i].textContent = l; });
