@@ -16,11 +16,19 @@ Cal("init", "__NS__", { origin: "https://cal.com" });
 Cal.ns["__NS__"]("inline", {
   elementOrSelector: "#cal-__NS__",
   /* "{plan}" in the link is filled from ?plan= (weekly, biweekly, monthly), which the
-     Stripe plan checkouts pass along, so each member lands on their plan's repeating slot. */
-  calLink: "__CALLINK__".replace("{plan}", (function () {
-    var p = new URLSearchParams(location.search).get("plan");
-    return ["weekly", "biweekly", "monthly"].indexOf(p) > -1 ? p : "visit";
-  })()),
+     Stripe plan checkouts pass along, so each member lands on their plan's repeating slot.
+     A plain link (no "{plan}") instead reads ?service=, which the services page passes so
+     a specific tier's "Book now" click lands straight on that event instead of the team page. */
+  calLink: (function () {
+    var base = "__CALLINK__";
+    if (base.indexOf("{plan}") > -1) {
+      var p = new URLSearchParams(location.search).get("plan");
+      return base.replace("{plan}", ["weekly", "biweekly", "monthly"].indexOf(p) > -1 ? p : "visit");
+    }
+    var svc = new URLSearchParams(location.search).get("service");
+    var known = ["full-detail", "premium-detail", "signature-detail"];
+    return svc && known.indexOf(svc) > -1 ? base + "/" + svc : base;
+  })(),
   config: { layout: window.innerWidth < 760 ? "column_view" : "month_view", theme: "light" }
 });
 Cal.ns["__NS__"]("ui", {

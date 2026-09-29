@@ -421,6 +421,7 @@ footer .wrap{display:flex; flex-wrap:wrap; gap:26px; justify-content:space-betwe
 @media(max-width:980px){.tiers{grid-template-columns:1fr; max-width:520px; margin:0 auto}}
 .tier{background:var(--surface); border:1px solid var(--line); border-radius:16px; overflow:hidden;
   display:flex; flex-direction:column; transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease}
+a.tier{text-decoration:none; cursor:pointer}
 .tier:hover{transform:translateY(-4px); box-shadow:0 20px 44px -24px rgba(20,26,34,.34)}
 .tier.pop{border-color:var(--accent-line); box-shadow:0 0 0 1px var(--accent-line), 0 22px 46px -26px rgba(27,109,224,.4)}
 .tier-head{position:relative; padding:26px 24px 22px; color:#fff; overflow:hidden}
@@ -1110,11 +1111,19 @@ Cal("init", "book", { origin: "https://cal.com" });
 Cal.ns["book"]("inline", {
   elementOrSelector: "#cal-book",
   /* "{plan}" in the link is filled from ?plan= (weekly, biweekly, monthly), which the
-     Stripe plan checkouts pass along, so each member lands on their plan's repeating slot. */
-  calLink: "vanyans-auto.detail".replace("{plan}", (function () {
-    var p = new URLSearchParams(location.search).get("plan");
-    return ["weekly", "biweekly", "monthly"].indexOf(p) > -1 ? p : "visit";
-  })()),
+     Stripe plan checkouts pass along, so each member lands on their plan's repeating slot.
+     A plain link (no "{plan}") instead reads ?service=, which the services page passes so
+     a specific tier's "Book now" click lands straight on that event instead of the team page. */
+  calLink: (function () {
+    var base = "vanyans-auto.detail";
+    if (base.indexOf("{plan}") > -1) {
+      var p = new URLSearchParams(location.search).get("plan");
+      return base.replace("{plan}", ["weekly", "biweekly", "monthly"].indexOf(p) > -1 ? p : "visit");
+    }
+    var svc = new URLSearchParams(location.search).get("service");
+    var known = ["full-detail", "premium-detail", "signature-detail"];
+    return svc && known.indexOf(svc) > -1 ? base + "/" + svc : base;
+  })(),
   config: { layout: window.innerWidth < 760 ? "column_view" : "month_view", theme: "light" }
 });
 Cal.ns["book"]("ui", {
@@ -1428,17 +1437,17 @@ Cal.ns["book"]("ui", {
 
     var DATA = {
       full: [
-        { name:'Full Detail', badge:'Refresh', price:185, tone:'a',
+        { name:'Full Detail', badge:'Refresh', price:185, tone:'a', link:'/book?service=full-detail',
           note:'in and out',
           list:['Interior vacuumed front to back','Every surface wiped down','Minor stains spot treated',
                 'Windows, mirrors and door jambs','Floor mats and trunk done','Hand wash outside','Wax protection',
                 'Rims and tires cleaned'] },
-        { name:'Premium Detail', badge:'Most popular', price:265, tone:'b', pop:true,
+        { name:'Premium Detail', badge:'Most popular', price:265, tone:'b', pop:true, link:'/book?service=premium-detail',
           note:'in and out',
           list:['Double vacuum, seats moved','Plastics cleaned and protected','Stains treated properly',
                 'Mats detailed and brought back','Trunk, jambs, windows, mirrors','Professional hand wash',
                 'Rims detailed and wheel wells','Spot polish where it needs it','Wax protection'] },
-        { name:'Signature Detail', badge:'V.I.P.', price:385, tone:'c',
+        { name:'Signature Detail', badge:'V.I.P.', price:385, tone:'c', link:'/book?service=signature-detail',
           note:'in and out',
           list:['Everything in Premium Detail','Clay bar over the whole car','Paint enhancement polish',
                 'Wheel wells and door jambs','Trim dressed, tires dressed','Best wax we carry',
@@ -1493,8 +1502,9 @@ Cal.ns["book"]("ui", {
       var set = DATA[key] || DATA.full;
       host.textContent = '';
       set.forEach(function(t){
-        var card = document.createElement('div');
+        var card = document.createElement(t.link ? 'a' : 'div');
         card.className = 'tier' + (t.pop ? ' pop' : '');
+        if(t.link) card.href = t.link;
         var items = t.list.map(function(){ return '<li>' + TICK + '<span></span></li>'; }).join('');
         card.innerHTML =
           '<div class="tier-head gloss ' + t.tone + '"><span class="tier-badge"></span><h3></h3></div>' +

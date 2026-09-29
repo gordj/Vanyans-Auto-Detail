@@ -148,6 +148,17 @@ $deepRoute = [System.Text.RegularExpressions.MatchEvaluator]{
   'href="' + (Get-CleanPath $key) + $m.Groups[2].Value + '"'
 }
 $src = [regex]::Replace($src, 'href="#/([a-z]*)([?#][^"]*)"', $deepRoute)
+
+# same conversion, but for hash routes built at runtime as single-quoted JS strings
+# (for example the services page's per-tier "Book now" links, set via card.href in JS
+# rather than a static href="" attribute)
+$deepRouteJs = [System.Text.RegularExpressions.MatchEvaluator]{
+  param($m)
+  $key = if ($m.Groups[1].Value) { $m.Groups[1].Value } else { 'home' }
+  "'" + (Get-CleanPath $key) + $m.Groups[2].Value + "'"
+}
+$src = [regex]::Replace($src, "'#/([a-z]*)([?#][^']*)'", $deepRouteJs)
+
 foreach ($k in $pages.Keys) {
   $target = Get-CleanPath $k
   if ($k -eq 'home') {
