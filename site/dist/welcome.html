@@ -1124,9 +1124,11 @@ Cal.ns["member"]("inline", {
       var p = new URLSearchParams(location.search).get("plan");
       return base.replace("{plan}", ["weekly", "biweekly", "monthly"].indexOf(p) > -1 ? p : "visit");
     }
+    var known = { "full-detail": "Full detail from $185.", "premium-detail": "Premium detail from $265.", "signature-detail": "Signature detail from $385." };
     var svc = new URLSearchParams(location.search).get("service");
-    var known = ["full-detail", "premium-detail", "signature-detail"];
-    return svc && known.indexOf(svc) > -1 ? base + "/" + svc : base;
+    var title = document.getElementById("book-title");
+    if (title && known[svc]) title.textContent = known[svc];
+    return known[svc] ? base + "/" + svc : base;
   })(),
   config: { layout: window.innerWidth < 760 ? "column_view" : "month_view", theme: "light" }
 });
