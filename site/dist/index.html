@@ -440,9 +440,13 @@ a.tier{text-decoration:none; cursor:pointer}
 .tier-price em{font-style:normal; font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:.05em}
 .tier-body h4{font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.15em; text-transform:uppercase;
   color:var(--muted); margin:0 0 11px}
+.tier-sub{font-family:var(--body); font-size:13px; font-weight:700; color:var(--ink); margin:14px 0 8px}
+.tier-sub:first-of-type{margin-top:0}
 .tier-list{list-style:none; margin:0; padding:0; display:grid; gap:8px; flex:1}
 .tier-list li{display:flex; gap:9px; font-size:14px; color:var(--ink-2); line-height:1.5}
 .tier-list li svg{flex:none; width:14px; height:14px; margin-top:3px}
+.tier-grid{grid-template-columns:1fr 1fr; column-gap:12px}
+@media(max-width:420px){.tier-grid{grid-template-columns:1fr}}
 
 /* ---------- recurring plans ---------- */
 .plans-band{background:linear-gradient(180deg,#0B1524,#16233A); color:#fff; position:relative; overflow:hidden}
@@ -1618,20 +1622,21 @@ footer .wrap{position:relative; display:block}
       full: [
         { name:'Full Detail', badge:'Refresh', price:185, tone:'a', link:'/book?service=full-detail',
           note:'in and out',
-          list:['Interior vacuumed front to back','Every surface wiped down','Minor stains spot treated',
-                'Windows, mirrors and door jambs','Floor mats and trunk done','Hand wash outside','Protective wax spray',
-                'Rims and tires cleaned'] },
+          ext:['Hand wash outside','Protective wax spray','Rims cleaned','Tires cleaned'],
+          int:['Interior vacuumed front to back','Every surface wiped down','Minor stains spot treated',
+               'Windows & mirrors','Door jambs','Floor mats','Trunk detailed'] },
         { name:'Premium Detail', badge:'Most popular', price:265, tone:'b', pop:true, link:'/book?service=premium-detail',
           note:'in and out',
-          list:['Double vacuum, seats moved','Plastics cleaned and protected','Stains treated properly',
-                'Mats detailed and brought back','Trunk, jambs, windows, mirrors','Professional hand wash',
-                'Rims detailed and wheel wells','Hand-applied wax'] },
+          ext:['Professional hand wash','Rims detailed','Wheel wells cleaned','Tires detailed','Hand-applied wax'],
+          int:['Double vacuum, seats moved','Plastics cleaned and protected','Stains treated properly',
+               'Mats detailed and brought back','Trunk detailed','Door jambs','Windows & mirrors'] },
         { name:'Signature Detail', badge:'V.I.P.', price:385, tone:'c', link:'/book?service=signature-detail',
           note:'in and out',
-          list:['Complete interior and exterior treatment, top to bottom','Clay bar decontamination on every panel',
-                'Paint enhancement polish for true depth and gloss','Wheel wells and door jambs detailed by hand',
-                'Trim and tires dressed to match','Best wax we carry, hand-applied',
-                'The finish we photograph'] }
+          ext:['Professional hand wash','Clay bar decontamination on every panel',
+               'Paint enhancement polish for true depth and gloss','Wheel wells and door jambs detailed by hand',
+               'Trim and tires dressed to match','Best wax we carry, hand-applied','The finish we photograph'],
+          int:['Double vacuum, seats moved','Plastics cleaned and protected','Stains treated properly',
+               'Mats detailed and brought back','Trunk detailed','Windows & mirrors'] }
       ],
       ext: [
         { name:'Exterior Maintenance', badge:'Refresh', price:115, tone:'a',
@@ -1685,20 +1690,35 @@ footer .wrap{position:relative; display:block}
         var card = document.createElement(t.link ? 'a' : 'div');
         card.className = 'tier' + (t.pop ? ' pop' : '');
         if(t.link) card.href = t.link;
-        var items = t.list.map(function(){ return '<li>' + TICK + '<span></span></li>'; }).join('');
         card.innerHTML =
           '<div class="tier-head gloss ' + t.tone + '"><span class="tier-badge"></span><h3></h3></div>' +
-          '<div class="tier-body">' +
-            '<div class="tier-price"><b></b><em></em></div>' +
-            '<h4>What is included</h4>' +
-            '<ul class="tier-list">' + items + '</ul>' +
-          '</div>';
+          '<div class="tier-body"><div class="tier-price"><b></b><em></em></div><h4>What is included</h4></div>';
         card.querySelector('.tier-badge').textContent = t.badge;
         card.querySelector('.tier-head h3').textContent = t.name;
         card.querySelector('.tier-price b').textContent = (t.from ? 'From $' : '$') + t.price;
         card.querySelector('.tier-price em').textContent = t.note;
-        var spans = card.querySelectorAll('.tier-list span');
-        t.list.forEach(function(l, i){ spans[i].textContent = l; });
+        var body = card.querySelector('.tier-body');
+        function addList(items, sectionLabel){
+          if(sectionLabel){
+            var h5 = document.createElement('h5');
+            h5.className = 'tier-sub';
+            h5.textContent = sectionLabel;
+            body.appendChild(h5);
+          }
+          var ul = document.createElement('ul');
+          ul.className = 'tier-list' + (sectionLabel ? ' tier-grid' : '');
+          items.forEach(function(l){
+            var li = document.createElement('li');
+            li.innerHTML = TICK;
+            var span = document.createElement('span');
+            span.textContent = l;
+            li.appendChild(span);
+            ul.appendChild(li);
+          });
+          body.appendChild(ul);
+        }
+        if(t.ext && t.int){ addList(t.ext, 'Exterior'); addList(t.int, 'Interior'); }
+        else { addList(t.list); }
         host.appendChild(card);
       });
       if(!reduce && hasGSAP){
