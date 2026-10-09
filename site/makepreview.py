@@ -25,6 +25,8 @@ IMAGES = {
     "LOGO": "logo.jpg",
     "CINEFOAM": "cine-foam.jpg",
     "CINECLEAN": "cine-clean.jpg",
+    "CINEFOAM_M": "cine-foam-m.jpg",
+    "CINECLEAN_M": "cine-clean-m.jpg",
 }
 
 # What each control does until Square is switched on. Kept in step with the

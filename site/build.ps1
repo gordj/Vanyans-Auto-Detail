@@ -121,6 +121,8 @@ $src = $src -replace '\{\{AFTER\}\}',  'img/after.jpg'
 $src = $src -replace '\{\{LOGO\}\}',   'img/logo.jpg'
 $src = $src -replace '\{\{CINEFOAM\}\}',  'img/cine-foam.jpg'
 $src = $src -replace '\{\{CINECLEAN\}\}', 'img/cine-clean.jpg'
+$src = $src -replace '\{\{CINEFOAM_M\}\}',  'img/cine-foam-m.jpg'
+$src = $src -replace '\{\{CINECLEAN_M\}\}', 'img/cine-clean-m.jpg'
 
 # --- Square booking and subscription targets ---
 $src = $src.Replace('{{SQ_EMBED}}',    $SQ_EMBED)

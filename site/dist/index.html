@@ -517,12 +517,15 @@ a.tier{text-decoration:none; cursor:pointer}
 .cine{position:relative; background:#0B1524}
 .cine-stage{position:relative; height:100vh; min-height:560px; overflow:hidden;
   display:flex; align-items:center; justify-content:center}
-.cine-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
-  object-position:50% 60%; will-change:transform; transform:none}
-.cine-clean{clip-path:inset(0 calc(100% - var(--wipe,30%)) 0 0)}
-.cine-sweep{position:absolute; top:0; bottom:0; left:var(--wipe,30%); width:160px; margin-left:-80px;
-  pointer-events:none; opacity:var(--sweep,0); mix-blend-mode:screen;
+.cine-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 60%}
+/* The wipe moves with transforms only (the reveal slides right while the photo inside slides
+   left by the same amount), so the browser never repaints the photos while scrolling. */
+.cine-reveal{position:absolute; inset:0; overflow:hidden; will-change:transform; transform:translate3d(-70%,0,0)}
+.cine-reveal .cine-img{will-change:transform; transform:translate3d(70%,0,0)}
+.cine-sweepwrap{position:absolute; inset:0; pointer-events:none; will-change:transform; transform:translate3d(30%,0,0)}
+.cine-sweep{position:absolute; top:0; bottom:0; left:0; width:160px; margin-left:-80px;
   background:linear-gradient(90deg, rgba(255,255,255,0), rgba(180,215,255,.65) 48%, rgba(255,255,255,0))}
+@media(min-width:901px){.cine-sweepwrap{mix-blend-mode:screen}}
 .cine-veil{position:absolute; inset:0; pointer-events:none;
   background:linear-gradient(180deg, rgba(11,21,36,.62), rgba(11,21,36,.18) 42%, rgba(11,21,36,.85))}
 .cine-copy{position:relative; z-index:2; text-align:center; padding:0 24px; width:100%}
@@ -534,7 +537,6 @@ a.tier{text-decoration:none; cursor:pointer}
 .cine-beats h2 em{font-style:normal; color:#7FB3FF}
 @media(max-width:900px){
   .cine-stage{height:auto; min-height:0; padding:70px 0}
-  .cine-img{position:absolute; transform:none}
   .cine-copy{padding:120px 24px}
 }
 .keys.keys-solo{grid-template-columns:1fr; max-width:64ch}
@@ -560,7 +562,8 @@ a.tier{text-decoration:none; cursor:pointer}
 .cine-img{object-position:50% 52%}
 .cine-veil{background:linear-gradient(180deg, rgba(8,14,24,.88) 0%, rgba(8,14,24,.28) 34%, rgba(8,14,24,.9) 100%)}
 .cine-copy{max-width:var(--maxw); margin:0 auto; padding:0 24px}
-@media(max-width:900px){.cine-sweep{width:100px; margin-left:-50px}}
+@media(max-width:900px){.cine-sweep{width:100px; margin-left:-50px}
+  .cine-beats h2{text-shadow:0 2px 18px rgba(0,0,0,.5)}}
 .cine-beats h2{font-size:clamp(38px,6vw,74px); max-width:26ch}
 .cine-cta{margin-top:30px}
 .cine-cta .btn{padding:14px 26px; font-size:13px; letter-spacing:.09em;
@@ -1085,9 +1088,17 @@ footer .wrap{position:relative; display:block}
 <main data-page="home">
   <section class="cine" id="cine">
     <div class="cine-stage">
-      <img class="cine-img cine-dirty" src="img/cine-foam.jpg?v=9c6e52d1" alt="A black Corvette under foam before the wash">
-      <img class="cine-img cine-clean" src="img/cine-clean.jpg?v=6231265a" alt="The same Corvette finished and gleaming">
-      <div class="cine-sweep"></div>
+      <picture>
+        <source media="(max-width:900px)" srcset="img/cine-foam-m.jpg?v=e6b12c69">
+        <img class="cine-img cine-dirty" src="img/cine-foam.jpg?v=9c6e52d1" alt="A black Corvette under foam before the wash">
+      </picture>
+      <div class="cine-reveal">
+        <picture>
+          <source media="(max-width:900px)" srcset="img/cine-clean-m.jpg?v=ea3ce92d">
+          <img class="cine-img cine-clean" src="img/cine-clean.jpg?v=6231265a" alt="The same Corvette finished and gleaming">
+        </picture>
+      </div>
+      <div class="cine-sweepwrap"><div class="cine-sweep"></div></div>
       <div class="cine-veil"></div>
       <div class="cine-copy">
         <div class="cine-beats">
@@ -1779,34 +1790,52 @@ footer .wrap{position:relative; display:block}
     var sec = document.getElementById('cine');
     if(!sec) return;
     var stage = sec.querySelector('.cine-stage');
-    var imgs  = sec.querySelectorAll('.cine-img');
+    var reveal = sec.querySelector('.cine-reveal');
+    var inner  = reveal.querySelector('.cine-img');
+    var sweepWrap = sec.querySelector('.cine-sweepwrap');
     var beats = sec.querySelectorAll('.cine-beats h2');
     var small = window.innerWidth < 900;
 
+    /* w is how much of the stage is clean, 0 to 100. Transforms only: the reveal slides
+       right while the photo inside slides left, so it stays put and nothing repaints. */
+    function setWipe(w, glow){
+      reveal.style.transform = 'translate3d(' + (w - 100) + '%,0,0)';
+      inner.style.transform = 'translate3d(' + (100 - w) + '%,0,0)';
+      sweepWrap.style.transform = 'translate3d(' + w + '%,0,0)';
+      sweepWrap.style.opacity = glow;
+    }
+    function showBeat(idx){
+      Array.prototype.forEach.call(beats, function(b,i){ b.classList.toggle('on', i === idx); });
+    }
+
     function settle(){
-      stage.style.setProperty('--wipe','100%');
-      stage.style.setProperty('--sweep','0');
-      /* Mobile and reduced motion see one static frame, so show the FIRST beat.
+      setWipe(100, 0);
+      /* Reduced motion sees one static frame, so show the FIRST beat.
          It is the only line that reads as a headline on its own; the last one
          is the payoff to a sequence they never saw. */
-      Array.prototype.forEach.call(beats, function(b,i){ b.classList.toggle('on', i === 0); });
+      showBeat(0);
     }
     if(reduce || !hasGSAP){ settle(); return; }
 
     /* The wipe opens already under way, so the first frame shows both the foam
        and the finished paint and invites the scroll that finishes the job. */
     var START = 30;
-    stage.style.setProperty('--wipe', START + '%');
-    stage.style.setProperty('--sweep', '1');
+    setWipe(START, 1);
+    showBeat(0);
 
+    /* Phones: the address bar sliding away resizes the page mid-scroll, which would
+       recompute the pin on every swipe. Ignore that, and follow the finger directly
+       (no smoothing lag). */
+    ScrollTrigger.config({ ignoreMobileResize: true });
+    var lastBeat = 0;
     ScrollTrigger.create({
-      trigger: sec, start: 'top top', end: small ? '+=560' : '+=700', pin: true, scrub: .28,
+      trigger: sec, start: 'top top', end: small ? '+=560' : '+=700', pin: true,
+      scrub: small ? true : .28, anticipatePin: 1,
       onUpdate: function(self){
         var p = self.progress;
-        stage.style.setProperty('--wipe', (START + p*(100-START)).toFixed(1) + '%');
-        stage.style.setProperty('--sweep', p < .985 ? '1' : '0');
+        setWipe(START + p*(100-START), p < .985 ? 1 : 0);
         var idx = p < .5 ? 0 : 1;   /* two beats: land, then scroll */
-        Array.prototype.forEach.call(beats, function(b,i){ b.classList.toggle('on', i === idx); });
+        if(idx !== lastBeat){ lastBeat = idx; showBeat(idx); }
       }
     });
   }
