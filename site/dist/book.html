@@ -560,6 +560,7 @@ a.tier{text-decoration:none; cursor:pointer}
 .cine-img{object-position:50% 52%}
 .cine-veil{background:linear-gradient(180deg, rgba(8,14,24,.88) 0%, rgba(8,14,24,.28) 34%, rgba(8,14,24,.9) 100%)}
 .cine-copy{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+@media(max-width:900px){.cine-sweep{width:100px; margin-left:-50px}}
 .cine-beats h2{font-size:clamp(38px,6vw,74px); max-width:26ch}
 .cine-cta{margin-top:30px}
 .cine-cta .btn{padding:14px 26px; font-size:13px; letter-spacing:.09em;
@@ -1614,7 +1615,7 @@ Cal.ns["book"]("ui", {
          is the payoff to a sequence they never saw. */
       Array.prototype.forEach.call(beats, function(b,i){ b.classList.toggle('on', i === 0); });
     }
-    if(reduce || !hasGSAP || small){ settle(); return; }
+    if(reduce || !hasGSAP){ settle(); return; }
 
     /* The wipe opens already under way, so the first frame shows both the foam
        and the finished paint and invites the scroll that finishes the job. */
@@ -1623,7 +1624,7 @@ Cal.ns["book"]("ui", {
     stage.style.setProperty('--sweep', '1');
 
     ScrollTrigger.create({
-      trigger: sec, start: 'top top', end: '+=700', pin: true, scrub: .28,
+      trigger: sec, start: 'top top', end: small ? '+=560' : '+=700', pin: true, scrub: .28,
       onUpdate: function(self){
         var p = self.progress;
         stage.style.setProperty('--wipe', (START + p*(100-START)).toFixed(1) + '%');
