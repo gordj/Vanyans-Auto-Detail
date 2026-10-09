@@ -562,6 +562,10 @@ a.tier{text-decoration:none; cursor:pointer}
 .cine-img{object-position:50% 52%}
 .cine-veil{background:linear-gradient(180deg, rgba(8,14,24,.88) 0%, rgba(8,14,24,.28) 34%, rgba(8,14,24,.9) 100%)}
 .cine-copy{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+@media(max-width:700px){.cine{display:none}
+  /* the bar is fixed and two rows tall on phones (about 106px), so the first section on
+     every page needs extra top room or its small label hides underneath it */
+  main > section:first-child, .cine + section{padding-top:132px}}
 @media(max-width:900px){.cine-sweep{width:100px; margin-left:-50px}
   .cine-beats h2{text-shadow:0 2px 18px rgba(0,0,0,.5)}}
 .cine-beats h2{font-size:clamp(38px,6vw,74px); max-width:26ch}
@@ -1594,6 +1598,11 @@ footer .wrap{position:relative; display:block}
   function cineScroll(){
     var sec = document.getElementById('cine');
     if(!sec) return;
+    /* Phones skip the hero entirely (display:none), so there is nothing to pin. Turning a
+       phone sideways past the breakpoint reloads once so the hero starts up properly. */
+    var phoneMQ = window.matchMedia('(max-width:700px)');
+    if(phoneMQ.addEventListener){ phoneMQ.addEventListener('change', function(){ location.reload(); }); }
+    if(!sec.getClientRects().length) return;
     var stage = sec.querySelector('.cine-stage');
     var reveal = sec.querySelector('.cine-reveal');
     var inner  = reveal.querySelector('.cine-img');
