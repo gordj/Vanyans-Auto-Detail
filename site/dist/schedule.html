@@ -415,7 +415,8 @@ footer .wrap{display:flex; flex-wrap:wrap; gap:26px; justify-content:space-betwe
   border:none; border-radius:999px; padding:11px 24px; cursor:pointer; white-space:nowrap; transition:background .18s, color .18s}
 .tabs button:hover{color:var(--ink)}
 .tabs button[aria-selected="true"]{background:var(--accent); color:#fff}
-@media(max-width:620px){.tabs{width:100%; justify-content:stretch} .tabs button{flex:1; padding:11px 10px; font-size:13.5px}}
+@media(max-width:620px){.tabs{width:100%; justify-content:stretch} .tabs button{flex:1; padding:11px 10px; font-size:13.5px}
+  .tabs.pkg-tabs{display:grid; grid-template-columns:1fr 1fr; border-radius:22px}}
 
 .tiers{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; align-items:start}
 @media(max-width:980px){.tiers{grid-template-columns:1fr; max-width:520px; margin:0 auto}}
@@ -1187,6 +1188,7 @@ footer .wrap{position:relative; display:block}
           <a href="/services?tab=full">Full Detail</a>
           <a href="/services?tab=ext">Exterior Only</a>
           <a href="/services?tab=int">Interior Only</a>
+          <a href="/services?tab=polish">Polishing</a>
         </div>
 
         <div class="foot-col">
