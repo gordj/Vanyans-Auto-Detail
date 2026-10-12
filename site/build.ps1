@@ -49,7 +49,7 @@ $pages = [ordered]@{
   home = @{
     file  = 'index.html'
     title = "Mobile Car Detailing in Burbank | Vanyan's Auto Detail"
-    desc  = 'Mobile detailing that comes to you anywhere within 60 miles of Burbank. Hand wash, paint correction and ceramic coating, 15 years experience, open 24/7. Call 818-660-5845.'
+    desc  = 'Mobile detailing that comes to you anywhere within 60 miles of Burbank. Hand wash, paint correction and ceramic coating, 15 years experience, open daily 9am to 5pm. Call 818-660-5845.'
   }
   services = @{
     file  = 'services.html'
@@ -252,7 +252,10 @@ $sitemap = "<?xml version=`"1.0`" encoding=`"UTF-8`"?>`r`n<urlset xmlns=`"http:/
 [IO.File]::WriteAllText((Join-Path $dist 'sitemap.xml'), $sitemap, (New-Object Text.UTF8Encoding $false))
 [IO.File]::WriteAllText((Join-Path $dist 'robots.txt'), "User-agent: *`r`nAllow: /`r`n`r`nSitemap: $SITE/sitemap.xml`r`n", (New-Object Text.UTF8Encoding $false))
 
+if (Test-Path (Join-Path $root '_headers')) { Copy-Item (Join-Path $root '_headers') (Join-Path $dist '_headers') }
+
 "sitemap.xml   written"
 "robots.txt    written"
+"_headers      copied"
 ""
 "dist total: {0:N0} KB" -f ((Get-ChildItem $dist -Recurse -File | Measure-Object Length -Sum).Sum / 1KB)
