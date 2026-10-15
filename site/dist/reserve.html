@@ -1133,7 +1133,6 @@ footer .wrap{position:relative; display:block}
           </div>
           <div class="frow">
             <div class="field"><label for="rsv-phone">Mobile number</label><input id="rsv-phone" type="tel" autocomplete="tel" maxlength="30"></div>
-            <div class="field"><label for="rsv-vehicle">Vehicle</label><input id="rsv-vehicle" placeholder="Year, make, model" maxlength="80"></div>
           </div>
           <div class="field" style="margin-bottom:16px"><label for="rsv-address">Where is the car parked?</label>
             <input id="rsv-address" autocomplete="street-address" placeholder="Street address, city" maxlength="200"></div>
@@ -1285,7 +1284,7 @@ footer .wrap{position:relative; display:block}
       call('/api/hold', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ plan: state.plan, start: state.start, name: $('rsv-name').value, email: $('rsv-email').value,
-          phone: $('rsv-phone').value, address: $('rsv-address').value, vehicle: $('rsv-vehicle').value,
+          phone: $('rsv-phone').value, address: $('rsv-address').value,
           smsConsent: state.sms ? $('rsv-sms').checked : false, website: $('rsv-hp').value })
       }).then(function (r) {
         if (r.ok && r.json.checkoutUrl) { go.textContent = 'Taking you to checkout…'; window.location.href = r.json.checkoutUrl; return; }
