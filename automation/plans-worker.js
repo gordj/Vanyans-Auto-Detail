@@ -658,13 +658,12 @@ export function validateHold(b, smsOn = true) {
   let digits = clean(b.phone, 30).replace(/\D/g, "");
   if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
   const address = clean(b.address, 200);
-  const vehicle = clean(b.vehicle, 80);
+  const vehicle = clean(b.vehicle, 80) || "Not provided";
   const start = Date.parse(clean(b.start, 40));
   if (name.length < 2) return { error: "Enter your name." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Enter a valid email." };
   if (digits.length !== 10) return { error: "Enter a 10-digit mobile number." };
   if (address.length < 8) return { error: "Enter the address where the car is parked." };
-  if (vehicle.length < 2) return { error: "Enter your vehicle." };
   if (smsOn && b.smsConsent !== true) return { error: "Please agree to the text reminders to continue." };
   if (!Number.isFinite(start)) return { error: "Pick a time." };
   return { value: { plan, name, email, phone: "+1" + digits, address, vehicle, start, sms: smsOn && b.smsConsent === true } };
