@@ -252,6 +252,7 @@ $sitemap = "<?xml version=`"1.0`" encoding=`"UTF-8`"?>`r`n<urlset xmlns=`"http:/
 [IO.File]::WriteAllText((Join-Path $dist 'sitemap.xml'), $sitemap, (New-Object Text.UTF8Encoding $false))
 [IO.File]::WriteAllText((Join-Path $dist 'robots.txt'), "User-agent: *`r`nAllow: /`r`n`r`nSitemap: $SITE/sitemap.xml`r`n", (New-Object Text.UTF8Encoding $false))
 
+Get-ChildItem $root -Filter 'google*.html' -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $dist $_.Name) }
 if (Test-Path (Join-Path $root '_headers')) { Copy-Item (Join-Path $root '_headers') (Join-Path $dist '_headers') }
 
 "sitemap.xml   written"
