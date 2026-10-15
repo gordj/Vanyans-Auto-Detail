@@ -236,7 +236,7 @@ foreach ($key in $pages.Keys) {
 <meta property="og:title" content="$($p.title)">
 <meta property="og:description" content="$($p.desc)">
 <meta property="og:url" content="$canonical">
-<meta property="og:image" content="$SITE/img/hero.jpg">
+<meta property="og:image" content="$SITE/img/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="img/logo.jpg">
 <link rel="apple-touch-icon" href="img/logo.jpg">
