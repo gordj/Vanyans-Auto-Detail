@@ -105,6 +105,16 @@ $pages = [ordered]@{
   }
 }
 
+# City landing pages: one page per entry in cities.json (sections generated into template.html by gencities.py)
+$cityList = Get-Content (Join-Path $root 'cities.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+foreach ($c in $cityList) {
+  $pages[$c.key] = @{
+    file  = "mobile-car-detailing-$($c.key).html"
+    title = "Mobile Car Detailing in $($c.name), CA | Vanyan's Auto Detail"
+    desc  = "Mobile car detailing in $($c.name), CA. We come to your home or work with our own water and power. Full Detail from `$185, no travel charge. Call 818-660-5845."
+  }
+}
+
 # Cloudflare Pages serves /book, not /book.html, and 308-redirects the latter.
 # Every URL we emit uses the clean form so no internal click costs a redirect.
 function Get-CleanPath($key) {

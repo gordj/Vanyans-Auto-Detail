@@ -1,0 +1,122 @@
+[
+  {
+    "key": "glendale", "name": "Glendale", "zone": "core",
+    "lead": "Glendale is right next door to our Burbank base, so it is one of the places we reach fastest. We pull up with our own water and power and do the whole detail in your driveway, at your office or in your building's garage.",
+    "spots": [
+      "Hillside homes in the Verdugo Woodlands and Chevy Chase Canyon, where the driveway is the whole job site",
+      "Condos and apartment buildings downtown and along Brand, with assigned garage spots",
+      "Offices and dealerships around Central Avenue that want cars done during the workday"
+    ],
+    "near": ["Burbank", "Pasadena", "Eagle Rock", "La Cañada Flintridge", "Sun Valley", "Studio City"]
+  },
+  {
+    "key": "pasadena", "name": "Pasadena", "zone": "core",
+    "lead": "Pasadena sits inside our core coverage, so there is no travel charge and same-day openings come up often. Craftsman bungalows, hillside estates and office parks are all the same to us: we bring the wash bay.",
+    "spots": [
+      "Craftsman bungalows and tree-lined streets around Bungalow Heaven, where street parking is common and we work curbside",
+      "Larger homes in the San Rafael hills and Linda Vista with long or gated driveways",
+      "Offices and parking structures along Lake Avenue and Colorado Boulevard"
+    ],
+    "near": ["Glendale", "Altadena", "South Pasadena", "San Marino", "La Cañada Flintridge", "Eagle Rock"]
+  },
+  {
+    "key": "studiocity", "name": "Studio City", "zone": "core",
+    "lead": "Studio City is a short hop from our Burbank base, which makes it an easy one to fit in around other jobs. We bring everything with us, so a steep canyon driveway or a tight condo garage is no problem.",
+    "spots": [
+      "Hillside homes off Laurel Canyon and Coldwater Canyon, including narrow and sloped driveways",
+      "Condos and townhomes along Ventura Boulevard with garage parking",
+      "Production offices and studio lots nearby that want a car handled during the day"
+    ],
+    "near": ["Burbank", "Sherman Oaks", "North Hollywood", "Toluca Lake", "Universal City", "Encino"]
+  },
+  {
+    "key": "shermanoaks", "name": "Sherman Oaks", "zone": "core",
+    "lead": "Sherman Oaks is close enough to Burbank that we are often in the neighborhood already. We handle the car where it is parked, whether that is a driveway in the flats or a garage on the hill.",
+    "spots": [
+      "Homes in the hills above Ventura Boulevard and the flats south of it",
+      "Apartment and condo buildings with underground parking that we can work in",
+      "Busy professionals along the Ventura corridor who would rather not drive to a wash"
+    ],
+    "near": ["Studio City", "Encino", "Van Nuys", "North Hollywood", "Burbank", "Woodland Hills"]
+  },
+  {
+    "key": "northhollywood", "name": "North Hollywood", "zone": "core",
+    "lead": "North Hollywood is one of the closest neighborhoods to our Burbank base. We detail cars at apartments, homes and workplaces across NoHo without you ever leaving your place.",
+    "spots": [
+      "Apartment and loft buildings around the NoHo Arts District with garage or lot parking",
+      "Single-family streets toward Toluca Lake and Valley Village with room in the driveway",
+      "Studios and workplaces nearby where a detail can happen while you work"
+    ],
+    "near": ["Burbank", "Studio City", "Toluca Lake", "Sun Valley", "Sherman Oaks", "Valley Village"]
+  },
+  {
+    "key": "encino", "name": "Encino", "zone": "core",
+    "lead": "Encino is covered with no travel charge, and we can usually book it within a day or two. Estates, hillside homes and office buildings along the boulevard all get the same careful, self-contained detail.",
+    "spots": [
+      "Larger homes in the hills and south of Ventura Boulevard with gated or long driveways",
+      "Condo communities with shared parking where we use your assigned space",
+      "Offices along the Ventura corridor that book several cars in one visit"
+    ],
+    "near": ["Sherman Oaks", "Tarzana", "Woodland Hills", "Studio City", "Reseda", "Beverly Hills"]
+  },
+  {
+    "key": "beverlyhills", "name": "Beverly Hills", "zone": "core",
+    "lead": "Beverly Hills is inside our core coverage, so you pay the same listed price as anywhere else. We care for everything from daily drivers to garage collections, in your driveway or building garage.",
+    "spots": [
+      "Homes in the flats and the hills with gated driveways and motor courts",
+      "High-rise and low-rise buildings with valet or residential garage parking",
+      "Owners with more than one car, where we do the whole garage in one visit at a discount for each extra car"
+    ],
+    "near": ["West Hollywood", "Brentwood", "Century City", "Bel Air", "Westwood", "Santa Monica"]
+  },
+  {
+    "key": "granadahills", "name": "Granada Hills", "zone": "core",
+    "lead": "Granada Hills is within our core coverage, with no travel charge and room in the schedule most weeks. Most homes here have a driveway, which makes for a simple and thorough setup.",
+    "spots": [
+      "Single-family streets with driveways, the easiest setup for a full detail",
+      "Hillside homes toward the foothills where we work with the slope",
+      "Families with two or three cars who want them all done in one visit"
+    ],
+    "near": ["Northridge", "Porter Ranch", "Chatsworth", "Sylmar", "Mission Hills", "Sun Valley"]
+  },
+  {
+    "key": "woodlandhills", "name": "Woodland Hills", "zone": "standard",
+    "lead": "Woodland Hills is covered at the standard rate with no travel charge, usually booked a day or two out. Warner Center workplaces and neighborhood driveways are equally easy for us.",
+    "spots": [
+      "Homes south of Ventura Boulevard and in the nearby hills",
+      "Offices and parking structures in and around Warner Center",
+      "Apartment and condo communities with assigned parking"
+    ],
+    "near": ["Calabasas", "Encino", "Tarzana", "Canoga Park", "West Hills", "Sherman Oaks"]
+  },
+  {
+    "key": "santamonica", "name": "Santa Monica", "zone": "standard",
+    "lead": "Santa Monica is covered at the standard rate with no travel charge, usually booked a day or two ahead. Coastal air is hard on paint, so a regular detail is worth more here than most places.",
+    "spots": [
+      "Condos and apartment buildings near the beach with garage parking we can work in",
+      "Homes in the neighborhoods north and south of Wilshire Boulevard",
+      "Offices around downtown and Main Street that want cars cleaned while you work"
+    ],
+    "near": ["Brentwood", "Venice", "Pacific Palisades", "Beverly Hills", "Culver City", "West Los Angeles"]
+  },
+  {
+    "key": "calabasas", "name": "Calabasas", "zone": "standard",
+    "lead": "Calabasas is covered at the standard rate with no travel charge, usually booked a day or two out. Many homes here sit in gated communities, so just send us the gate code when you book and we handle the rest.",
+    "spots": [
+      "Gated communities where a gate code or guest list is all we need",
+      "Hillside homes with larger driveways and room to work",
+      "Families and commuters who want the car done while they are at home or at work"
+    ],
+    "near": ["Woodland Hills", "Agoura Hills", "Hidden Hills", "West Hills", "Westlake Village", "Thousand Oaks"]
+  },
+  {
+    "key": "santaclarita", "name": "Santa Clarita", "zone": "standard",
+    "lead": "Santa Clarita is covered at the standard rate with no travel charge, usually booked a day or two out. The valley has plenty of driveways and families with several cars, which is exactly what our one-visit, whole-garage option is for.",
+    "spots": [
+      "Single-family neighborhoods in Valencia, Saugus and Stevenson Ranch with driveways",
+      "Canyon Country and Newhall homes where we can do several cars in one visit",
+      "Commuters who drive the 14 or the 5 and want the car done while they are home"
+    ],
+    "near": ["Valencia", "Newhall", "Saugus", "Canyon Country", "Stevenson Ranch", "Sylmar"]
+  }
+]
