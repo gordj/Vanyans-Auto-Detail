@@ -1287,7 +1287,7 @@ footer .wrap{position:relative; display:block}
           phone: $('rsv-phone').value, address: $('rsv-address').value, vehicle: 'Not provided',
           smsConsent: state.sms ? $('rsv-sms').checked : false, website: $('rsv-hp').value })
       }).then(function (r) {
-        if (r.ok && r.json.checkoutUrl) { go.textContent = 'Taking you to checkout…'; window.location.href = r.json.checkoutUrl; return; }
+        if (r.ok && r.json.checkoutUrl) { try { localStorage.setItem('vanyansBooking', JSON.stringify({ text: $('rsv-sum').textContent, at: Date.now() })); } catch (x) {} go.textContent = 'Taking you to checkout…'; window.location.href = r.json.checkoutUrl; return; }
         fail((r.json && r.json.error) || ('Something went wrong. ' + CALL));
         if (r.status === 409) load(state.plan, (r.json && r.json.error) || 'That time was just taken. Please pick another.');
       }).catch(function () { fail('We could not reach the scheduler. ' + CALL); });

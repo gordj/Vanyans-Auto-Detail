@@ -1116,6 +1116,7 @@ footer .wrap{position:relative; display:block}
           nothing to pay on the day. The slot you picked is now your standing time, and we keep it for you
           every cycle without you booking again.</p>
       </div>
+      <div class="rsv-sum" id="wel-sum" hidden style="font-size:17px; margin:0 0 24px; max-width:640px"></div>
       <div class="cards">
         <div class="card"><h3>A confirmation is on its way</h3><p>Check your email for your receipt. If you opted in, you will also get a text reminder 24 hours before each visit.</p></div>
         <div class="card"><h3>What happens next</h3><p>We arrive at your chosen time with our own water and power. You do not need to be home.</p></div>
@@ -1127,6 +1128,17 @@ footer .wrap{position:relative; display:block}
       <div style="margin-top:26px"><a class="btn btn-primary gloss" href="/">Back to home</a></div>
     </div>
   </section>
+<script>
+  (function () {
+    try {
+      var b = JSON.parse(localStorage.getItem('vanyansBooking') || 'null');
+      if (b && b.text && Date.now() - b.at < 6 * 3600 * 1000) {
+        var el = document.getElementById('wel-sum');
+        el.textContent = 'Your booking: ' + b.text; el.hidden = false;
+      }
+    } catch (x) {}
+  })();
+  </script>
 </main>
 
 <!-- ==================== PRIVACY POLICY ==================== -->
