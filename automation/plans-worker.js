@@ -491,6 +491,9 @@ async function sendMail(env, subject, text) {
  * customer.subscription.updated / .deleted. Cancelled now = no future visits; cancelled at period end =
  * paid visits kept, later ones removed; cancelled before the first visit = series deleted; un-cancelled =
  * series restored. Each series follows its own subscription (stripeSub). The hourly run is the safety net.
+ * Skipping a visit (rain, client asks): delete that ONE visit in Google Calendar ("This event"). Within the
+ * hour the client gets a one-visit credit in Stripe (their last bill amount, so it comes off the next bill),
+ * once per visit, and an email. Needs STRIPE_KEY permissions: Customers Write, Subscriptions Read, Invoices Read.
  *
  * Extra settings: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN (secrets),
  * CALENDAR_ID (optional, default "primary"), STRIPE_WEBHOOK_SECRET, TWILIO_SID / TWILIO_TOKEN /
@@ -999,6 +1002,82 @@ export async function endPlans(env, now, dry, report) {
   if (!dry) await kvPut(env, "gchecked", checked);
 }
 
+/* ---- skipped visits: deleting ONE visit in Google Calendar ("This event") = that visit is free */
+
+const SKIP_BACK_MS = 21 * DAY;       // skips made up to 3 weeks back are still credited
+const SKIP_AHEAD_MS = 120 * DAY;     // and skips planned up to 4 months ahead
+
+async function stripePost(env, path, form, idempotencyKey) {
+  spend();
+  const res = await fetch("https://api.stripe.com" + path, {
+    method: "POST",
+    headers: { authorization: `Bearer ${env.STRIPE_KEY}`, "content-type": "application/x-www-form-urlencoded", "idempotency-key": idempotencyKey },
+    body: new URLSearchParams(form).toString(),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Stripe ${path} failed (${res.status}): ${json.error?.message || ""}`);
+  return json;
+}
+
+/** What one visit costs this client, in cents: their last plan bill after discounts (a 100%-off test plan is 0). */
+async function visitPrice(env, pr) {
+  const s = await stripe(env, `/v1/subscriptions/${encodeURIComponent(pr.stripeSub)}?expand[]=latest_invoice`);
+  if (s.latest_invoice && typeof s.latest_invoice.total === "number") return Math.max(0, s.latest_invoice.total);
+  const it = s.items?.data?.[0];
+  return Math.max(0, (it?.price?.unit_amount || 0) * (it?.quantity || 1));
+}
+
+/** Start of a skipped visit from Google's originalStartTime (with or without a UTC offset). */
+const instanceStart = (inst) => {
+  const s = inst.originalStartTime?.dateTime || "";
+  return /[+-]\d{2}:\d{2}$|Z$/.test(s) ? Date.parse(s) : zonedFromLocal(s);
+};
+
+export async function creditSkips(env, now, dry, report) {
+  const checked = await kvJson(env, "gskipchecked", {});
+  const events = (await activeSeries(env)).sort((a, b) => (checked[a.id] || 0) - (checked[b.id] || 0));
+  for (const e of events) {
+    if (now - (checked[e.id] || 0) < RECHECK_MS) continue;
+    const pr = e.extendedProperties?.private || {};
+    try {
+      if (pr.stripeCustomer && pr.stripeSub) {
+        const from = Math.max(now - SKIP_BACK_MS, Date.parse(pr.paidAt || "") || 0);
+        const j = await gcal(env, calPath(env, `/events/${encodeURIComponent(e.id)}/instances`), {
+          query: [["showDeleted", "true"], ["timeMin", new Date(from).toISOString()],
+            ["timeMax", new Date(now + SKIP_AHEAD_MS).toISOString()], ["maxResults", "250"]],
+        });
+        let price = null;
+        for (const inst of j.items || []) {
+          if (inst.status !== "cancelled") continue;
+          const t = instanceStart(inst);
+          if (!t || (pr.endAt && t > Date.parse(pr.endAt))) continue; // removed because the plan ended, not skipped
+          const key = "skip:" + inst.id;
+          if (await kvGet(env, key)) continue;
+          if (price === null) price = await visitPrice(env, pr);
+          const dollars = `$${(price / 100).toFixed(price % 100 ? 2 : 0)}`;
+          if (!dry) {
+            if (price > 0) {
+              await stripePost(env, `/v1/customers/${encodeURIComponent(pr.stripeCustomer)}/balance_transactions`,
+                { amount: String(-price), currency: "usd", description: `Skipped visit ${fmt(t)}`, "metadata[skip]": inst.id }, "skip-" + inst.id);
+            }
+            if (env.STATE) await env.STATE.put(key, "1", { expirationTtl: 400 * 86400 });
+            await sendClientMail(env, pr.email, "Your visit is skipped",
+              [`Hi ${pr.name},`, "", `Your visit on ${fmt(t)} is skipped.` +
+                (price > 0 ? ` You won't be charged for it: ${dollars} comes off your next bill.` : ""),
+              "Your next visits stay at the same day and time.", `Questions? Call or text ${PHONE}.`, "", "Vanyan's Auto Detail"].join("\n"));
+          }
+          report.cancelled.push(item(key, `${pr.name}: visit ${fmt(t)} skipped, ${price > 0 ? dollars + " credit" : "no charge to credit"}${dry ? " (test mode)" : ""}`));
+        }
+      }
+      checked[e.id] = now;
+    } catch (err) {
+      if (err instanceof BudgetError) break;
+      report.warnings.push(item(`skiperr:${e.id}:${now}`, `${pr.name}: could not check skipped visits: ${errText(err)}`));
+    }
+  }
+  if (!dry) await kvPut(env, "gskipchecked", checked);
+}
+
 async function runGoogle(env, now) {
   const dry = env.DRY_RUN !== "0";
   const report = { at: new Date(now).toISOString(), dry, booked: [], cancelled: [], conflicts: [], warnings: [], error: null };
@@ -1007,6 +1086,7 @@ async function runGoogle(env, now) {
     report.holds = live;
     if (smsReady(env)) await sendReminders(env, now, dry, report); // no Twilio yet: texting is simply off
     await endPlans(env, now, dry, report);
+    await creditSkips(env, now, dry, report);
   } catch (e) {
     if (!(e instanceof BudgetError)) report.error = errText(e);
   }

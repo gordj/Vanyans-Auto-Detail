@@ -7,7 +7,7 @@
 /* Runs the Google Calendar plan visits in plans-worker.js against a fake Google Calendar, Stripe,
    Twilio and Resend. Nothing real is called. */
 import { runAll, createHold, freeStarts, cleanupHolds, handleWebhook, verifyStripeSignature, sendReminders,
-  endPlans, seriesTimes, validateHold, zonedToUtc, localParts, fmt, resetBudget } from "./plans-worker.js";
+  endPlans, creditSkips, seriesTimes, validateHold, zonedToUtc, localParts, fmt, resetBudget } from "./plans-worker.js";
 
 const H = 3600e3, D = 86400e3;
 const la = (y, m, d, hh, mm = 0) => zonedToUtc(y, m, d, hh, mm);
@@ -82,6 +82,18 @@ function install(w) {
         for (const b of w.g.extraBusy) if (b[0] < to && b[1] > from) busy.push({ start: new Date(b[0]).toISOString(), end: new Date(b[1]).toISOString() });
         return reply({ calendars: { [body.items[0].id]: { busy } } });
       }
+      const im = path.match(/^\/calendars\/[^/]+\/events\/([^/]+)\/instances$/);
+      if (im && method === "GET") {
+        const ev = w.g.events.find((e) => e.id === im[1] && e.status !== "cancelled");
+        if (!ev) return reply({ error: { code: 404 } }, 404);
+        const from = Date.parse(u.searchParams.get("timeMin")), to = Date.parse(u.searchParams.get("timeMax"));
+        const saved = w.g.cancelledInstances; w.g.cancelledInstances = new Set();
+        const all = instances(w, ev, from, to); w.g.cancelledInstances = saved;
+        const showDeleted = u.searchParams.get("showDeleted") === "true";
+        return reply({ items: all.filter((x) => showDeleted || !saved.has(x.id)).map((x) => ({
+          id: x.id, recurringEventId: ev.id, status: saved.has(x.id) ? "cancelled" : "confirmed",
+          originalStartTime: { dateTime: localIso(x.s), timeZone: "America/Los_Angeles" } })) });
+      }
       const m = path.match(/^\/calendars\/[^/]+\/events(?:\/([^/]+))?$/);
       if (m) {
         const id = m[1];
@@ -127,6 +139,14 @@ function install(w) {
       if (u.pathname === "/v1/customers/search") {
         const email = u.searchParams.get("query").match(/'(.+)'/)[1].toLowerCase();
         return reply({ data: w.stripe[email] ? [{ id: "cus_" + email }] : [] });
+      }
+      const bm = u.pathname.match(/^\/v1\/customers\/([^/]+)\/balance_transactions$/);
+      if (bm && method === "POST") {
+        const p = new URLSearchParams(opts.body);
+        const idem = opts.headers?.["idempotency-key"];
+        w.credits = w.credits || [];
+        if (!w.credits.some((c) => c.idem === idem)) w.credits.push({ customer: bm[1], amount: Number(p.get("amount")), description: p.get("description"), idem });
+        return reply({ id: "cbtxn_1" });
       }
       const sm = u.pathname.match(/^\/v1\/subscriptions\/(.+)$/);
       if (sm) return w.subs?.[sm[1]] ? reply({ id: sm[1], ...w.subs[sm[1]] }) : reply({ error: { message: "No such subscription" } }, 404);
@@ -299,6 +319,39 @@ const input = (o = {}) => ({ plan: "weekly", start: new Date(la(2026, 10, 1, 9))
   await hook({ id: "sub_f", status: "canceled", ended_at: NOW / 1000 }, "customer.subscription.deleted");
   check("U3 cancelled before the first visit: the whole series is removed", fresh.status === "cancelled", fresh.status);
   check("U3 owner is emailed about the changes", w.mails.some((m) => /Plan change/.test(m)), w.mails.length);
+}
+
+// S. skipping one visit in Google Calendar gives that client a one-visit credit, once
+{
+  const w = gworld(NOW); install(w);
+  w.subs = { sub_k: { status: "active", latest_invoice: { total: 11500 } }, sub_free: { status: "active", latest_invoice: { total: 0 } } };
+  const k = addEvent(w, { start: la(2026, 9, 23, 9), email: "k@example.com", name: "Kim", customer: "cus_k", sub: "sub_k" });
+  const f = addEvent(w, { start: la(2026, 9, 23, 13), email: "f2@example.com", name: "Free", customer: "cus_f", sub: "sub_free" });
+  const rep = () => ({ booked: [], cancelled: [], conflicts: [], warnings: [] });
+  w.g.cancelledInstances.add(`${k.id}_${stamp(la(2026, 10, 7, 9))}`);   // rain on Oct 7
+  w.g.cancelledInstances.add(`${f.id}_${stamp(la(2026, 10, 7, 13))}`);
+  const r1 = rep();
+  await creditSkips(w.env, NOW, false, r1);
+  check("S skipped visit: one $115 credit on that client's Stripe account", (w.credits || []).length === 1 && w.credits[0].customer === "cus_k" && w.credits[0].amount === -11500, w.credits);
+  check("S client is emailed that the visit is skipped and free", w.clientMails.some((m) => m.to === "k@example.com" && /skipped/.test(m.text) && /\$115/.test(m.text)), w.clientMails);
+  check("S a 100%-off test plan gets no credit but the skip is noted", !w.credits.some((c) => c.customer === "cus_f") && r1.cancelled.some((x) => /Free/.test(x.text)), r1.cancelled);
+  check("S the series itself keeps going", k.recurrence[0] === "RRULE:FREQ=WEEKLY;INTERVAL=1" && k.status !== "cancelled", k.recurrence);
+  await creditSkips(w.env, NOW + 2 * H, false, rep());
+  check("S the same skip is never credited twice", w.credits.length === 1, w.credits);
+  w.g.cancelledInstances.add(`${k.id}_${stamp(la(2026, 10, 14, 9))}`);
+  await creditSkips(w.env, NOW + 4 * H, false, rep());
+  check("S unlimited skips: a second skipped visit is credited too", w.credits.length === 2, w.credits);
+  k.extendedProperties.private.endAt = new Date(la(2026, 10, 20, 0)).toISOString();
+  w.g.cancelledInstances.add(`${k.id}_${stamp(la(2026, 10, 28, 9))}`);
+  await creditSkips(w.env, NOW + 6 * H, false, rep());
+  check("S visits removed because the plan ended are not credited", w.credits.length === 2, w.credits);
+  const w2 = gworld(NOW); install(w2); w2.env.DRY_RUN = "1";
+  w2.subs = { sub_k: { status: "active", latest_invoice: { total: 11500 } } };
+  const k2 = addEvent(w2, { start: la(2026, 9, 23, 9), name: "Dry", customer: "cus_k", sub: "sub_k" });
+  w2.g.cancelledInstances.add(`${k2.id}_${stamp(la(2026, 10, 7, 9))}`);
+  const r2 = rep();
+  await creditSkips(w2.env, NOW, true, r2);
+  check("S test mode reports the skip but credits nothing", !(w2.credits || []).length && r2.cancelled.length === 1, [w2.credits, r2.cancelled]);
 }
 
 // V. text reminders: once per visit, 24 h ahead, never for skipped or opted-out
