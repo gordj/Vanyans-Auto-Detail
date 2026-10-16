@@ -487,6 +487,10 @@ async function sendMail(env, subject, text) {
  * Stripe calls /api/stripe-webhook when paid: the hold becomes "confirmed" and one confirmation email
  * goes out. Cron: expired holds are deleted, an SMS reminder goes out 24 h before every visit, and a
  * series is stopped (UNTIL) when the Stripe subscription ends.
+ * Cancelling in Stripe updates the calendar within seconds: the webhook also listens for
+ * customer.subscription.updated / .deleted. Cancelled now = no future visits; cancelled at period end =
+ * paid visits kept, later ones removed; cancelled before the first visit = series deleted; un-cancelled =
+ * series restored. Each series follows its own subscription (stripeSub). The hourly run is the safety net.
  *
  * Extra settings: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN (secrets),
  * CALENDAR_ID (optional, default "primary"), STRIPE_WEBHOOK_SECRET, TWILIO_SID / TWILIO_TOKEN /
@@ -748,6 +752,9 @@ export async function handleWebhook(env, raw, sigHeader, now = Date.now()) {
   }
   let ev;
   try { ev = JSON.parse(raw); } catch { return { status: 400, body: { error: "bad body" } }; }
+  if (ev.type === "customer.subscription.updated" || ev.type === "customer.subscription.deleted") {
+    return subscriptionChanged(env, ev.data?.object || {}, now);
+  }
   if (ev.type !== "checkout.session.completed") return { status: 200, body: { ignored: ev.type } };
   const s = ev.data?.object || {};
   const id = s.client_reference_id;
@@ -889,38 +896,105 @@ async function customerStatus(env, customerId) {
 
 const untilStamp = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 
-export async function endPlans(env, now, dry, report) {
+/**
+ * When a Stripe subscription stops paying for visits, in ms, or null if it keeps going.
+ * Ended now: when it ended. Cancelled for later ("cancel at period end" or a set cancel date):
+ * that date, so visits already paid for stay and everything after is removed straight away.
+ */
+export function subscriptionEnd(s, now) {
+  if (ENDED.has(s.status)) return (s.ended_at || s.canceled_at || Math.floor(now / 1000)) * 1000;
+  const periodEnd = s.current_period_end || s.items?.data?.[0]?.current_period_end;
+  if (s.cancel_at) return s.cancel_at * 1000;
+  if (s.cancel_at_period_end && periodEnd) return periodEnd * 1000;
+  return null;
+}
+
+/** The RRULE with any UNTIL taken out, and the UNTIL it had (or ""). */
+export function splitRule(recurrence) {
+  const rule = (recurrence || []).find((r) => r.startsWith("RRULE:")) || "RRULE:FREQ=WEEKLY";
+  const m = rule.match(/;UNTIL=([^;]*)/);
+  return { base: rule.replace(/;UNTIL=[^;]*/g, ""), until: m ? m[1] : "" };
+}
+
+/**
+ * Makes one plan series match its subscription: stop it at endMs (null = keep it going, which also
+ * undoes an earlier stop if the client changed their mind). Returns a line for the owner, or "".
+ */
+async function applyEnd(env, e, endMs, now, dry) {
+  const pr = e.extendedProperties?.private || {};
+  const { base, until } = splitRule(e.recurrence);
+  const path = calPath(env, `/events/${encodeURIComponent(e.id)}`);
+  if (endMs === null) {
+    if (!until || !pr.endAt) return "";                 // running and not stopped by us: nothing to do
+    if (!dry) await gcal(env, path, { method: "PATCH", query: [["sendUpdates", "none"]], body: {
+      recurrence: [base], extendedProperties: { private: { ...pr, status: "confirmed", endAt: "", endedAt: "" } } } });
+    return `${pr.name}: plan resumed, visits continue every ${PLAN_KEYS[pr.plan]?.weeks || 1} week(s)${dry ? " (test mode)" : ""}`;
+  }
+  const firstMs = zonedFromLocal(e.start?.dateTime);
+  if (endMs <= firstMs) {                               // cancelled before the first visit: nothing to keep
+    if (!dry) await gcalDelete(env, e.id);
+    return `${pr.name}: plan cancelled before the first visit, all visits removed${dry ? " (test mode)" : ""}`;
+  }
+  const stamp = untilStamp(endMs);
+  if (until === stamp) return "";                        // already stopped at this date
+  const status = endMs <= now ? "ended" : "ending";
+  if (!dry) await gcal(env, path, { method: "PATCH", query: [["sendUpdates", "none"]], body: {
+    recurrence: [`${base};UNTIL=${stamp}`],
+    extendedProperties: { private: { ...pr, status, endAt: new Date(endMs).toISOString(), endedAt: new Date(now).toISOString() } } } });
+  return status === "ended"
+    ? `${pr.name}: plan cancelled, future visits removed${dry ? " (test mode)" : ""}`
+    : `${pr.name}: plan cancelled as of ${fmt(endMs)}; paid visits before then kept, later visits removed${dry ? " (test mode)" : ""}`;
+}
+
+// Plan series that are paid up or winding down (holds and finished series are left out).
+async function activeSeries(env, extra = []) {
   const j = await gcal(env, calPath(env, "/events"), {
-    query: [["privateExtendedProperty", "vanyans=1"], ["privateExtendedProperty", "status=confirmed"], ["maxResults", "250"]],
+    query: [["privateExtendedProperty", "vanyans=1"], ...extra, ["maxResults", "250"]],
   });
+  return (j.items || []).filter((e) => e.status !== "cancelled" &&
+    ["confirmed", "ending"].includes(e.extendedProperties?.private?.status));
+}
+
+/** Stripe webhook: a subscription was cancelled, scheduled to cancel, resumed or ended. Acts within seconds. */
+async function subscriptionChanged(env, s, now) {
+  if (!s.id) return { status: 200, body: { ignored: "no subscription" } };
+  const dry = env.DRY_RUN !== "0";
+  const lines = [];
+  for (const e of await activeSeries(env, [["privateExtendedProperty", `stripeSub=${s.id}`]])) {
+    const line = await applyEnd(env, e, subscriptionEnd(s, now), now, dry);
+    if (line) lines.push(line);
+  }
+  if (lines.length) await sendMail(env, "Plan change", lines.join("\n"));
+  return { status: 200, body: { subscription: s.id, changed: lines } };
+}
+
+/** Hourly safety net for anything the webhook missed. Each series follows its own subscription. */
+export async function endPlans(env, now, dry, report) {
   const checked = await kvJson(env, "gchecked", {});
-  const events = (j.items || []).filter((e) => e.status !== "cancelled")
-    .sort((a, b) => (checked[a.id] || 0) - (checked[b.id] || 0));
+  const events = (await activeSeries(env)).sort((a, b) => (checked[a.id] || 0) - (checked[b.id] || 0));
   for (const e of events) {
     if (now - (checked[e.id] || 0) < RECHECK_MS) continue;
     const pr = e.extendedProperties?.private || {};
-    let status;
     try {
-      status = pr.stripeCustomer ? await customerStatus(env, pr.stripeCustomer) : await stripeStatus(env, pr.email || "");
+      if (pr.stripeSub) {
+        const line = await applyEnd(env, e, subscriptionEnd(await stripe(env, `/v1/subscriptions/${encodeURIComponent(pr.stripeSub)}`), now), now, dry);
+        if (line) report.cancelled.push(item(`gsub:${e.id}:${line}`, line));
+      } else {
+        // older series saved before the subscription id was stored: fall back to the customer or email
+        const status = pr.stripeCustomer ? await customerStatus(env, pr.stripeCustomer) : await stripeStatus(env, pr.email || "");
+        if (status === "ended") {
+          const line = await applyEnd(env, e, now, now, dry);
+          if (line) report.cancelled.push(item(`gend:${e.id}`, line));
+        } else if (status === "none") {
+          report.warnings.push(item(`gnostripe:${e.id}`, `${pr.name} (${pr.email}) has no Stripe plan. Their visits were left alone.`));
+        }
+      }
     } catch (err) {
       if (err instanceof BudgetError) break;
       report.warnings.push(item(`gerr:${e.id}:${now}`, `${pr.name}: ${errText(err)}`));
       continue;
     }
     checked[e.id] = now;
-    if (status === "ended") {
-      if (!dry) {
-        const rule = (e.recurrence || []).find((r) => r.startsWith("RRULE:")) || "RRULE:FREQ=WEEKLY";
-        const stopped = rule.replace(/;UNTIL=[^;]*/g, "") + `;UNTIL=${untilStamp(now)}`;
-        await gcal(env, calPath(env, `/events/${encodeURIComponent(e.id)}`), {
-          method: "PATCH", query: [["sendUpdates", "none"]],
-          body: { recurrence: [stopped], extendedProperties: { private: { ...pr, status: "ended", endedAt: new Date(now).toISOString() } } },
-        });
-      }
-      report.cancelled.push(item(`gend:${e.id}`, `${pr.name}: plan ended, future visits removed${dry ? " (test mode)" : ""}`));
-    } else if (status === "none") {
-      report.warnings.push(item(`gnostripe:${e.id}`, `${pr.name} (${pr.email}) has no Stripe plan. Their visits were left alone.`));
-    }
   }
   if (!dry) await kvPut(env, "gchecked", checked);
 }

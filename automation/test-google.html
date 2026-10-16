@@ -49,14 +49,14 @@ function instances(w, ev, fromMs, toMs) {
 const live = (w) => w.g.events.filter((e) => e.status !== "cancelled");
 const matches = (ev, filters) => filters.every((f) => { const [k, v] = f.split("="); return ev.extendedProperties?.private?.[k] === v; });
 
-function addEvent(w, { plan = "weekly", weeks = 1, start, status = "confirmed", email = "a@example.com", name = "Alex Doe", customer, id }) {
+function addEvent(w, { plan = "weekly", weeks = 1, start, status = "confirmed", email = "a@example.com", name = "Alex Doe", customer, sub, id }) {
   const ev = {
     id: id || "v" + (++w.g.seq).toString(16).padStart(24, "0"), status: "confirmed", summary: `${status === "hold" ? "HOLD - " : ""}${plan} plan - ${name}`,
     location: "1 Test St, Burbank, CA", start: { dateTime: localIso(start), timeZone: "America/Los_Angeles" },
     end: { dateTime: localIso(start + 90 * 60e3), timeZone: "America/Los_Angeles" }, recurrence: [`RRULE:FREQ=WEEKLY;INTERVAL=${weeks}`],
     created: new Date(w.now - 5 * D + w.g.seq * 1000).toISOString(),
     extendedProperties: { private: { vanyans: "1", plan, status, name, email, phone: "+18185550100", vehicle: "Corvette", sms: "1",
-      holdAt: String(w.now), ...(customer ? { stripeCustomer: customer } : {}) } },
+      holdAt: String(w.now), ...(customer ? { stripeCustomer: customer } : {}), ...(sub ? { stripeSub: sub } : {}) } },
   };
   w.g.events.push(ev);
   return ev;
@@ -128,6 +128,8 @@ function install(w) {
         const email = u.searchParams.get("query").match(/'(.+)'/)[1].toLowerCase();
         return reply({ data: w.stripe[email] ? [{ id: "cus_" + email }] : [] });
       }
+      const sm = u.pathname.match(/^\/v1\/subscriptions\/(.+)$/);
+      if (sm) return w.subs?.[sm[1]] ? reply({ id: sm[1], ...w.subs[sm[1]] }) : reply({ error: { message: "No such subscription" } }, 404);
       if (u.pathname === "/v1/subscriptions") {
         const email = u.searchParams.get("customer").slice(4);
         return reply({ data: (w.stripe[email] || []).map((s) => ({ status: s })) });
@@ -248,7 +250,7 @@ const input = (o = {}) => ({ plan: "weekly", start: new Date(la(2026, 10, 1, 9))
 {
   const w = gworld(NOW); install(w);
   w.stripe["gone@example.com"] = ["canceled"]; w.stripe["ok@example.com"] = ["active"]; w.stripe["late@example.com"] = ["past_due"];
-  const gone = addEvent(w, { start: la(2026, 10, 1, 9), email: "gone@example.com", name: "Gone", customer: "cus_gone@example.com" });
+  const gone = addEvent(w, { start: la(2026, 9, 24, 9), email: "gone@example.com", name: "Gone", customer: "cus_gone@example.com" });
   const ok = addEvent(w, { start: la(2026, 10, 1, 11), email: "ok@example.com", name: "Ok", customer: "cus_ok@example.com" });
   const late = addEvent(w, { start: la(2026, 10, 1, 14), email: "late@example.com", name: "Late", customer: "cus_late@example.com" });
   const report = { booked: [], cancelled: [], conflicts: [], warnings: [] };
@@ -260,6 +262,43 @@ const input = (o = {}) => ({ plan: "weekly", start: new Date(la(2026, 10, 1, 9))
   const before = w.fetches;
   await endPlans(w.env, NOW + 10 * 60e3, false, { booked: [], cancelled: [], conflicts: [], warnings: [] });
   check("U members are not re-checked within an hour (saves requests)", w.fetches - before <= 1, w.fetches - before);
+}
+
+// U2. each series follows its OWN subscription (two test plans on one email used to keep each other alive)
+{
+  const w = gworld(NOW); install(w);
+  w.subs = { sub_now: { status: "canceled", ended_at: NOW / 1000 - 3600 }, sub_later: { status: "active", cancel_at_period_end: true, current_period_end: la(2026, 10, 7, 12) / 1000 } };
+  w.stripe["same@example.com"] = ["canceled", "active"];
+  const a = addEvent(w, { start: la(2026, 9, 23, 9), email: "same@example.com", name: "First", customer: "cus_same@example.com", sub: "sub_now" });
+  const b = addEvent(w, { start: la(2026, 9, 23, 11), email: "same@example.com", name: "Second", customer: "cus_same@example.com", sub: "sub_later" });
+  const report = { booked: [], cancelled: [], conflicts: [], warnings: [] };
+  await endPlans(w.env, NOW, false, report);
+  check("U2 cancelled plan stops even when the same email has another live plan", /UNTIL=/.test(a.recurrence[0]) && a.extendedProperties.private.status === "ended", a.recurrence);
+  check("U2 cancel-at-period-end keeps paid visits, stops at the period end", b.recurrence[0].endsWith("UNTIL=" + stamp(la(2026, 10, 7, 12))) && b.extendedProperties.private.status === "ending", b.recurrence);
+  check("U2 owner report lists both", report.cancelled.length === 2, report.cancelled);
+}
+
+// U3. Stripe webhook: cancelling in Stripe updates the calendar at once, and un-cancelling restores it
+{
+  const w = gworld(NOW); install(w);
+  const s = addEvent(w, { start: la(2026, 9, 23, 9), email: "s@example.com", name: "Sub", sub: "sub_w" });
+  const fresh = addEvent(w, { start: la(2026, 10, 7, 9), email: "f@example.com", name: "Fresh", sub: "sub_f" });
+  const other = addEvent(w, { start: la(2026, 9, 23, 14), email: "o@example.com", name: "Other", sub: "sub_o" });
+  const hook = async (obj, type = "customer.subscription.updated") => {
+    resetBudget(45);
+    const raw = JSON.stringify({ type, data: { object: obj } });
+    return handleWebhook(w.env, raw, await sign(raw, "whsec_test", NOW / 1000 | 0), NOW);
+  };
+  await hook({ id: "sub_w", status: "active", cancel_at_period_end: true, current_period_end: la(2026, 10, 14, 9) / 1000 });
+  check("U3 cancel at period end from Stripe: series stops at that date right away", s.recurrence[0].endsWith("UNTIL=" + stamp(la(2026, 10, 14, 9))), s.recurrence);
+  check("U3 other members untouched", other.recurrence[0] === "RRULE:FREQ=WEEKLY;INTERVAL=1", other.recurrence);
+  await hook({ id: "sub_w", status: "active", cancel_at_period_end: false });
+  check("U3 client changes their mind: visits come back", s.recurrence[0] === "RRULE:FREQ=WEEKLY;INTERVAL=1" && s.extendedProperties.private.status === "confirmed", s.recurrence);
+  await hook({ id: "sub_w", status: "canceled", ended_at: NOW / 1000 }, "customer.subscription.deleted");
+  check("U3 cancelled now: no future visits", s.recurrence[0].endsWith("UNTIL=" + stamp(NOW)) && s.extendedProperties.private.status === "ended", s.recurrence);
+  await hook({ id: "sub_f", status: "canceled", ended_at: NOW / 1000 }, "customer.subscription.deleted");
+  check("U3 cancelled before the first visit: the whole series is removed", fresh.status === "cancelled", fresh.status);
+  check("U3 owner is emailed about the changes", w.mails.some((m) => /Plan change/.test(m)), w.mails.length);
 }
 
 // V. text reminders: once per visit, 24 h ahead, never for skipped or opted-out
@@ -306,7 +345,7 @@ const input = (o = {}) => ({ plan: "weekly", start: new Date(la(2026, 10, 1, 9))
 {
   const w = gworld(NOW); install(w);
   w.stripe["gone@example.com"] = ["canceled"];
-  const gone = addEvent(w, { start: la(2026, 10, 1, 9), email: "gone@example.com", customer: "cus_gone@example.com" });
+  const gone = addEvent(w, { start: la(2026, 9, 24, 9), email: "gone@example.com", customer: "cus_gone@example.com" });
   await runAll(w.env, NOW);
   check("X scheduled run ends the plan and still runs the Cal.com sync", /UNTIL=/.test(gone.recurrence[0]) && w.calCalls >= 1, [gone.recurrence, w.calCalls]);
   const w2 = gworld(NOW); install(w2); w2.env.CAL_SYNC = "0";
