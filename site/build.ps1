@@ -49,7 +49,7 @@ $pages = [ordered]@{
   home = @{
     file  = 'index.html'
     title = "Mobile Car Detailing in Burbank | Vanyan's Auto Detail"
-    desc  = 'Mobile detailing that comes to you anywhere within 60 miles of Burbank. Hand wash, paint correction and ceramic coating, 15 years experience, open daily 9am to 5pm. Call 818-660-5845.'
+    desc  = 'Mobile detailing that comes to you anywhere within 60 miles of Burbank. Hand wash, paint correction and ceramic coating, 15 years experience, open daily 9am to 5pm, closed major holidays. Call 818-660-5845.'
   }
   services = @{
     file  = 'services.html'
@@ -199,7 +199,7 @@ $bustImages = [System.Text.RegularExpressions.MatchEvaluator]{
 }
 
 $schema = @"
-{"@context":"https://schema.org","@type":"AutoWash","name":"Vanyan's Auto Detail","alternateName":"Van Wash","url":"$SITE","telephone":"+1-818-660-5845","email":"$EMAIL","image":"$SITE/img/logo.jpg","priceRange":"`$`$","currenciesAccepted":"USD","paymentAccepted":"Cash, Credit Card, Debit Card","address":{"@type":"PostalAddress","addressLocality":"Burbank","addressRegion":"CA","addressCountry":"US"},"areaServed":{"@type":"GeoCircle","geoMidpoint":{"@type":"GeoCoordinates","address":"Burbank, CA"},"geoRadius":"96560"},"knowsLanguage":["en","hy","ru"],"openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],"opens":"09:00","closes":"17:00"}],"sameAs":["https://www.instagram.com/vanyansautodetail/","https://www.facebook.com/profile.php?id=61574502154173"]}
+{"@context":"https://schema.org","@type":"AutoWash","name":"Vanyan's Auto Detail","alternateName":"Van Wash","url":"$SITE","telephone":"+1-818-660-5845","email":"$EMAIL","image":"$SITE/img/logo.jpg","priceRange":"`$`$","currenciesAccepted":"USD","paymentAccepted":"Cash, Credit Card, Debit Card","address":{"@type":"PostalAddress","addressLocality":"Burbank","addressRegion":"CA","addressCountry":"US"},"areaServed":{"@type":"GeoCircle","geoMidpoint":{"@type":"GeoCoordinates","address":"Burbank, CA"},"geoRadius":"96560"},"knowsLanguage":["en","hy","ru"],"openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],"opens":"09:00","closes":"17:00"}],"specialOpeningHoursSpecification":[{"@type":"OpeningHoursSpecification","validFrom":"2026-11-26","validThrough":"2026-11-26","opens":"00:00","closes":"00:00"},{"@type":"OpeningHoursSpecification","validFrom":"2026-12-25","validThrough":"2026-12-25","opens":"00:00","closes":"00:00"},{"@type":"OpeningHoursSpecification","validFrom":"2027-01-01","validThrough":"2027-01-01","opens":"00:00","closes":"00:00"}],"sameAs":["https://www.instagram.com/vanyansautodetail/","https://www.facebook.com/profile.php?id=61574502154173"]}
 "@
 
 foreach ($key in $pages.Keys) {
