@@ -89,7 +89,7 @@ def page(c):
       <div class="sec-head">
         <span class="eyebrow">How it works</span>
         <h2>Nothing for you to set up.</h2>
-        <p>We bring our own water and power, so there is no hose to run and no cord to plug in. {when} Prefer it on a schedule? Our <a href="#/#plans" style="color:var(--accent); font-weight:600">maintenance plans</a> keep the same slot every week, every two weeks or every month.</p>
+        <p>We bring our own water and power, so there is no hose to run and no cord to plug in. {when}</p>
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:14px; margin-top:8px">
         <a class="btn btn-primary gloss" href="#/book">Book a detail</a>

@@ -86,6 +86,12 @@ $pages = [ordered]@{
     title = "Terms & Text Messaging | Vanyan's Auto Detail"
     desc  = "Terms for Vanyan's Auto Detail maintenance plans and appointment reminder text messages."
   }
+  plans = @{
+    file    = 'plans.html'
+    title   = "Maintenance Plans | Vanyan's Auto Detail"
+    desc    = 'Weekly, every two weeks or monthly mobile detailing plans.'
+    noindex = $true
+  }
   reserve = @{
     file    = 'reserve.html'
     title   = "Reserve Your Plan Time | Vanyan's Auto Detail"
