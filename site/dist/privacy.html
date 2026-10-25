@@ -281,6 +281,12 @@ a.contact-v:hover{color:var(--accent-hot)}
 .contact-v.small{font-size:15.5px; font-family:var(--body); font-weight:600; letter-spacing:0; word-break:break-word}
 .frow{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px}
 @media(max-width:600px){.frow{grid-template-columns:1fr}}
+.ac-wrap{position:relative}
+.ac-list{position:absolute; left:0; right:0; top:100%; margin:6px 0 0; padding:6px; list-style:none; background:#fff; border:1px solid var(--line-2,#CFD4DB); border-radius:12px; box-shadow:0 14px 34px rgba(11,21,36,.16); z-index:30; max-height:290px; overflow:auto}
+.ac-list li{padding:10px 12px; border-radius:8px; cursor:pointer; font-size:15px; line-height:1.35; color:var(--ink,#111827)}
+.ac-list li small{display:block; color:var(--muted,#6E7A88); font-size:12.5px}
+.ac-list li[aria-selected="true"],.ac-list li:hover{background:var(--accent-dim,#EAF1FD)}
+.ac-list .ac-credit{cursor:default; font-size:11px; color:var(--muted,#6E7A88); padding:6px 12px 2px; background:none!important}
 .frow4{grid-template-columns:repeat(2,minmax(0,1fr)); margin-bottom:20px}
 .frow4 .field{margin:0}
 @media(max-width:600px){.frow4{grid-template-columns:1fr}}
@@ -1154,6 +1160,7 @@ footer .wrap{position:relative; display:block}
           <li>Cloudflare, which hosts this website and our scheduling tools.</li>
           <li>Our email and text-message providers, to send your confirmation and reminders.</li>
           <li>Cal.com, if you book a one-time service through our booking page.</li>
+          <li>Photon, a public address-search service built on OpenStreetMap, which receives the part of your address you have typed so far in order to suggest matches.</li>
         </ul>
         <p>We may also disclose information if the law requires it.</p>
 

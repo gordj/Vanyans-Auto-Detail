@@ -281,6 +281,12 @@ a.contact-v:hover{color:var(--accent-hot)}
 .contact-v.small{font-size:15.5px; font-family:var(--body); font-weight:600; letter-spacing:0; word-break:break-word}
 .frow{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px}
 @media(max-width:600px){.frow{grid-template-columns:1fr}}
+.ac-wrap{position:relative}
+.ac-list{position:absolute; left:0; right:0; top:100%; margin:6px 0 0; padding:6px; list-style:none; background:#fff; border:1px solid var(--line-2,#CFD4DB); border-radius:12px; box-shadow:0 14px 34px rgba(11,21,36,.16); z-index:30; max-height:290px; overflow:auto}
+.ac-list li{padding:10px 12px; border-radius:8px; cursor:pointer; font-size:15px; line-height:1.35; color:var(--ink,#111827)}
+.ac-list li small{display:block; color:var(--muted,#6E7A88); font-size:12.5px}
+.ac-list li[aria-selected="true"],.ac-list li:hover{background:var(--accent-dim,#EAF1FD)}
+.ac-list .ac-credit{cursor:default; font-size:11px; color:var(--muted,#6E7A88); padding:6px 12px 2px; background:none!important}
 .frow4{grid-template-columns:repeat(2,minmax(0,1fr)); margin-bottom:20px}
 .frow4 .field{margin:0}
 @media(max-width:600px){.frow4{grid-template-columns:1fr}}
@@ -1131,10 +1137,10 @@ footer .wrap{position:relative; display:block}
           <h3>2. Your details</h3>
           <div class="rsv-sum" id="rsv-sum"></div>
           <div class="frow frow4">
-            <div class="field"><label for="rsv-name">Your name</label><input id="rsv-name" autocomplete="name" maxlength="80"></div>
+            <div class="field"><label for="rsv-name">Full name</label><input id="rsv-name" autocomplete="name" maxlength="80"></div>
             <div class="field"><label for="rsv-email">Email</label><input id="rsv-email" type="email" autocomplete="email" maxlength="120"></div>
-            <div class="field"><label for="rsv-phone">Mobile number</label><input id="rsv-phone" type="tel" autocomplete="tel" maxlength="30"></div>
-            <div class="field"><label for="rsv-address">Car location</label><input id="rsv-address" autocomplete="street-address" placeholder="Street address, city" maxlength="200"></div>
+            <div class="field"><label for="rsv-phone">Mobile number</label><input id="rsv-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(818) 555-0123" maxlength="14"></div>
+            <div class="field ac-wrap"><label for="rsv-address">Service address</label><input id="rsv-address" autocomplete="off" placeholder="Start typing your street address" maxlength="200" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="rsv-ac"><ul class="ac-list" id="rsv-ac" role="listbox" hidden></ul></div>
           </div>
           <label class="rsv-check" id="rsv-sms-wrap" style="display:none"><input type="checkbox" id="rsv-sms">
             <span>Text me a reminder 24 hours before each visit. Message and data rates may apply. Reply STOP to opt out.</span></label>
@@ -1275,6 +1281,97 @@ footer .wrap{position:relative; display:block}
     Array.prototype.forEach.call(tabs, function (b) {
       b.addEventListener('click', function () { load(b.getAttribute('data-rplan')); });
     });
+
+    /* ---------- phone: format as (818) 555-0123 while typing ---------- */
+    (function () {
+      var ph = $('rsv-phone'); if (!ph) return;
+      var prev = 0;
+      ph.addEventListener('input', function (e) {
+        var d = ph.value.replace(/\D/g, '');
+        if (d.length === 11 && d.charAt(0) === '1') d = d.slice(1);
+        d = d.slice(0, 10);
+        if (e.inputType && e.inputType.indexOf('delete') === 0 && d.length === prev && d.length > 0) d = d.slice(0, -1);
+        prev = d.length;
+        var out = d;
+        if (d.length > 6) out = '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
+        else if (d.length > 3) out = '(' + d.slice(0, 3) + ') ' + d.slice(3);
+        else if (d.length > 0) out = '(' + d;
+        ph.value = out;
+      });
+    })();
+
+    /* ---------- address: suggestions as you type (Photon / OpenStreetMap, Southern California only) ---------- */
+    (function () {
+      var inp = $('rsv-address'), list = $('rsv-ac'); if (!inp || !list) return;
+      var timer = null, seq = 0, items = [], active = -1;
+      var ST = { California: 'CA' };
+      function close() { list.hidden = true; list.innerHTML = ''; items = []; active = -1; inp.setAttribute('aria-expanded', 'false'); }
+      function label(f, typed) {
+        var p = f.properties || {}, street = p.street || p.name;
+        if (!street) return null;
+        var num = p.housenumber || '';
+        if (!num) { var m = typed.match(/^\s*(\d+[A-Za-z]?)(?![A-Za-z0-9])/); if (m) num = m[1]; }
+        var city = p.city || p.locality || p.district || p.county || '';
+        var st = ST[p.state] || p.state || '';
+        var line1 = (num ? num + ' ' : '') + street;
+        var tail = [city, (st + ' ' + (p.postcode || '')).trim()].filter(Boolean).join(', ');
+        return { line1: line1, tail: tail, full: tail ? line1 + ', ' + tail : line1 };
+      }
+      function paint() {
+        list.innerHTML = '';
+        items.forEach(function (it, i) {
+          var li = document.createElement('li');
+          li.setAttribute('role', 'option');
+          li.setAttribute('aria-selected', String(i === active));
+          li.textContent = it.line1;
+          var s = document.createElement('small'); s.textContent = it.tail; li.appendChild(s);
+          li.addEventListener('mousedown', function (e) { e.preventDefault(); pick(i); });
+          list.appendChild(li);
+        });
+        var c = document.createElement('li'); c.className = 'ac-credit'; c.setAttribute('aria-hidden', 'true');
+        c.textContent = 'Address search by Photon, © OpenStreetMap contributors';
+        list.appendChild(c);
+        list.hidden = false; inp.setAttribute('aria-expanded', 'true');
+      }
+      function pick(i) { if (!items[i]) return; inp.value = items[i].full; close(); }
+      function lookup(q, typed) {
+        var url = 'https://photon.komoot.io/api/?lang=en&limit=8&lat=34.18&lon=-118.31&bbox=-119.7,33.2,-116.9,35.0&q=' + encodeURIComponent(q);
+        return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+          var out = [], seen = {};
+          ((j && j.features) || []).forEach(function (f) {
+            if ((f.properties || {}).countrycode !== 'US') return;
+            var l = label(f, typed); if (!l || seen[l.full]) return;
+            seen[l.full] = 1; out.push(l);
+          });
+          return out.slice(0, 6);
+        });
+      }
+      function search() {
+        var q = inp.value.trim();
+        if (q.length < 3) { close(); return; }
+        var my = ++seq;
+        lookup(q, q).then(function (res) {
+          /* Many house numbers are missing from the map data. If nothing matched, look up the street alone
+             and put the number the customer typed back in front of it. */
+          var rest = q.replace(/^\s*\d+[A-Za-z]?\s+/, '');
+          if (!res.length && rest !== q && rest.length >= 3) return lookup(rest, q);
+          return res;
+        }).then(function (res) {
+          if (my !== seq) return;
+          items = res; active = -1;
+          if (items.length) paint(); else close();
+        }).catch(function () { close(); });
+      }
+      inp.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(search, 260); });
+      inp.addEventListener('keydown', function (e) {
+        if (list.hidden) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); active = (active + 1) % items.length; paint(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); active = (active - 1 + items.length) % items.length; paint(); }
+        else if (e.key === 'Enter' && active > -1) { e.preventDefault(); pick(active); }
+        else if (e.key === 'Escape') close();
+      });
+      inp.addEventListener('blur', function () { setTimeout(close, 120); });
+    })();
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
