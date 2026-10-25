@@ -260,6 +260,7 @@ a.contact-v:hover{color:var(--accent-hot)}
 .frow{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px}
 @media(max-width:600px){.frow{grid-template-columns:1fr}}
 .ac-wrap{position:relative}
+.ac-wrap input.ac-ok{border-color:#1E9E63; background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M2 7.4l3.2 3.2L12 3.6' fill='none' stroke='%231E9E63' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center/16px; padding-right:40px}
 .ac-list{position:absolute; left:0; right:0; top:100%; margin:6px 0 0; padding:6px; list-style:none; background:#fff; border:1px solid var(--line-2,#CFD4DB); border-radius:12px; box-shadow:0 14px 34px rgba(11,21,36,.16); z-index:30; max-height:290px; overflow:auto}
 .ac-list li{padding:10px 12px; border-radius:8px; cursor:pointer; font-size:15px; line-height:1.35; color:var(--ink,#111827)}
 .ac-list li small{display:block; color:var(--muted,#6E7A88); font-size:12.5px}
@@ -3038,10 +3039,12 @@ footer .wrap{position:relative; display:block}
       });
     })();
 
+    var addrCheck = function () { return ''; };
+
     /* ---------- address: suggestions as you type (Photon / OpenStreetMap, Southern California only) ---------- */
     (function () {
       var inp = $('rsv-address'), list = $('rsv-ac'); if (!inp || !list) return;
-      var timer = null, seq = 0, items = [], active = -1;
+      var timer = null, seq = 0, items = [], active = -1, confirmed = '';
       var ST = { California: 'CA' };
       var ZIPCITY = {
         '91352': 'Sun Valley', '91402': 'Panorama City', '91401': 'Van Nuys', '91405': 'Van Nuys', '91406': 'Van Nuys', '91411': 'Van Nuys',
@@ -3053,6 +3056,23 @@ footer .wrap{position:relative; display:block}
         '91306': 'Winnetka', '91335': 'Reseda', '91303': 'Canoga Park', '91304': 'Canoga Park', '91307': 'West Hills',
         '91040': 'Sunland', '91042': 'Tujunga', '90039': 'Los Angeles', '90027': 'Los Angeles', '90068': 'Los Angeles',
         '91105': 'Pasadena', '91106': 'Pasadena', '91107': 'Pasadena', '91103': 'Pasadena', '91104': 'Pasadena', '91101': 'Pasadena'
+      };
+      var CITIES = ['Burbank', 'Glendale', 'Pasadena', 'Los Angeles', 'Beverly Hills', 'Santa Monica', 'Calabasas', 'Santa Clarita', 'Valencia', 'Newhall', 'Altadena', 'South Pasadena', 'Toluca Lake', 'Universal City', 'Eagle Rock', 'La Cañada Flintridge'];
+      Object.keys(ZIPCITY).forEach(function (z) { if (CITIES.indexOf(ZIPCITY[z]) < 0) CITIES.push(ZIPCITY[z]); });
+      /* Returns '' when the address is good, otherwise a message for the customer. */
+      addrCheck = function () {
+        var v = inp.value.trim(), lc = v.toLowerCase();
+        if (confirmed && v === confirmed) return '';
+        var hint = 'Pick your service address from the suggestions, or type the full address with city and ZIP.';
+        if (!/^\d+[A-Za-z]?\s+\S+/.test(v)) return hint;
+        var zm = v.match(/\b(9\d{4})\b/), zip = zm ? zm[1] : '';
+        var typedCity = CITIES.filter(function (c) { return lc.indexOf(c.toLowerCase()) > -1; });
+        if (!zip && !typedCity.length) return hint;
+        var want = zip && ZIPCITY[zip];
+        if (want && want !== 'Los Angeles' && lc.indexOf(want.toLowerCase()) < 0 && typedCity.length) {
+          return 'ZIP ' + zip + ' is in ' + want + ', but the address says ' + typedCity[0] + '. Pick your address from the suggestions so the city and ZIP match.';
+        }
+        return '';
       };
       function close() { list.hidden = true; list.innerHTML = ''; items = []; active = -1; inp.setAttribute('aria-expanded', 'false'); }
       function label(f, typed) {
@@ -3086,7 +3106,8 @@ footer .wrap{position:relative; display:block}
         list.appendChild(c);
         list.hidden = false; inp.setAttribute('aria-expanded', 'true');
       }
-      function pick(i) { if (!items[i]) return; inp.value = items[i].full; close(); }
+      function mark() { inp.classList.toggle('ac-ok', !!confirmed && inp.value === confirmed); }
+      function pick(i) { if (!items[i]) return; inp.value = items[i].full; confirmed = inp.value; mark(); close(); }
       function lookup(q, typed) {
         var url = 'https://photon.komoot.io/api/?lang=en&limit=8&lat=34.18&lon=-118.31&bbox=-119.7,33.2,-116.9,35.0&q=' + encodeURIComponent(q);
         return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
@@ -3115,7 +3136,7 @@ footer .wrap{position:relative; display:block}
           if (items.length) paint(); else close();
         }).catch(function () { close(); });
       }
-      inp.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(search, 260); });
+      inp.addEventListener('input', function () { mark(); clearTimeout(timer); timer = setTimeout(search, 260); });
       inp.addEventListener('keydown', function (e) {
         if (list.hidden) return;
         if (e.key === 'ArrowDown') { e.preventDefault(); active = (active + 1) % items.length; paint(); }
@@ -3130,6 +3151,8 @@ footer .wrap{position:relative; display:block}
       e.preventDefault();
       errEl.hidden = true;
       if (!state.start) { fail('Pick a day and time first.'); return; }
+      var addrMsg = addrCheck();
+      if (addrMsg) { fail(addrMsg); $('rsv-address').focus(); return; }
       go.disabled = true; go.textContent = 'Holding your time…';
       call('/api/hold', {
         method: 'POST', headers: { 'content-type': 'application/json' },
