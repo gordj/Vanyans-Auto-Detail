@@ -748,7 +748,7 @@ export async function handleWebhook(env, raw, sigHeader, now = Date.now()) {
   if (!["paid", "no_payment_required"].includes(s.payment_status)) return { status: 200, body: { ignored: "not paid yet" } };
 
   const pending = await kvJson(env, "pending:" + id, null);
-  if (pending && pending.v) return confirmPending(env, id, pending.v, s, now);
+  if (pending && pending.v) return confirmPending(env, id, pending, s, now);
 
   let e;
   try {
@@ -791,7 +791,9 @@ async function slotStillFree(env, planKey, t0, now) {
 }
 
 /** Payment arrived for a form submission that has no calendar hold: book it now, or tell the owner. */
-async function confirmPending(env, id, v, s, now) {
+async function confirmPending(env, id, pending, s, now) {
+  const v = pending.v;
+  const submittedAt = pending.at || now; // when they filled in the form (and agreed to texts)
   const planKey = v.plan;
   const planName = PLAN_KEYS[planKey]?.name || "Plan";
   if (await kvGet(env, "conf:" + id)) return { status: 200, body: { already: true } };
@@ -815,7 +817,7 @@ async function confirmPending(env, id, v, s, now) {
 
   if (!(await slotStillFree(env, planKey, v.start, now))) return takenMail("that time is no longer free.");
 
-  const body = planEvent(planKey, v.start, v, now, false);
+  const body = planEvent(planKey, v.start, v, submittedAt, false);
   body.id = id;
   body.extendedProperties.private = {
     ...body.extendedProperties.private,
