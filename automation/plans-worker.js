@@ -413,8 +413,8 @@ const item = (key, text) => ({ key, text });
 async function kvGet(env, key) {
   return env.STATE ? await env.STATE.get(key) : null;
 }
-async function kvPut(env, key, value) {
-  if (env.STATE) await env.STATE.put(key, typeof value === "string" ? value : JSON.stringify(value));
+async function kvPut(env, key, value, ttl) {
+  if (env.STATE) await env.STATE.put(key, typeof value === "string" ? value : JSON.stringify(value), ttl ? { expirationTtl: ttl } : undefined);
 }
 async function kvJson(env, key, fallback) {
   const s = await kvGet(env, key);
@@ -520,6 +520,7 @@ const BUFFER_MS = 0;                 // back-to-back: a 9:00 visit ends 10:30 an
 const OFFER_DAYS = 21;               // first visits offered: the next 3 weeks
 const CHECK_DAYS = 84;               // a slot must stay free 12 weeks ahead (covers every 1/2/4-week overlap)
 const HOLD_MS = 30 * 60e3;
+const PENDING_TTL = 14 * 86400;       // a form submission waits this long for its Stripe payment (seconds)
 const MAX_HOLDS = 10;                // stops someone filling the calendar with unpaid holds
 const RECHECK_MS = 55 * 60e3;        // how often each member's Stripe plan is re-checked
 const ALLOWED_ORIGINS = new Set([
@@ -699,34 +700,16 @@ export async function createHold(env, input, now = Date.now()) {
   const checked = validateHold(input, smsReady(env));
   if (checked.error) return { status: 400, body: { error: checked.error } };
   const v = checked.value;
-  const live = await cleanupHolds(env, now);
-  if (live >= MAX_HOLDS) return { status: 429, body: { error: "Lots of people are booking right now. Try again in a few minutes." } };
+  if (!env.STATE) return { status: 503, body: { error: "Booking is temporarily unavailable. Call or text " + PHONE + "." } };
   const free = await freeStarts(env, v.plan, now);
   if (!free.includes(v.start)) return { status: 409, body: { error: "That time was just taken. Please pick another." } };
 
-  const body = planEvent(v.plan, v.start, v, now, true);
-  body.id = randomId();
-  const emp = String(env.EMPLOYEE_EMAILS || "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (emp.length) body.attendees = emp.map((email) => ({ email }));
-  const mine = await gcal(env, calPath(env, "/events"), { method: "POST", body, query: [["sendUpdates", "none"]] });
-
-  // two people picking the same slot in the same second: the earlier hold keeps it
-  const others = await gcal(env, calPath(env, "/events"), {
-    query: [["singleEvents", "true"], ["timeMin", new Date(v.start - BUFFER_MS).toISOString()],
-      ["timeMax", new Date(v.start + VISIT_MS + BUFFER_MS).toISOString()], ["privateExtendedProperty", "vanyans=1"]],
-  });
-  const myCreated = Date.parse(mine.created || new Date(now).toISOString());
-  const lost = (others.items || []).some((o) => {
-    if (o.status === "cancelled" || String(o.id).startsWith(body.id)) return false;
-    const oc = Date.parse(o.created || 0);
-    return oc < myCreated || (oc === myCreated && String(o.id) < body.id);
-  });
-  if (lost) {
-    await gcalDelete(env, body.id);
-    return { status: 409, body: { error: "That time was just taken. Please pick another." } };
-  }
-  const url = `${PAY_LINKS[v.plan]}?client_reference_id=${encodeURIComponent(body.id)}&prefilled_email=${encodeURIComponent(v.email)}`;
-  return { status: 200, body: { holdId: body.id, checkoutUrl: url, expiresAt: new Date(now + HOLD_MS).toISOString() } };
+  // No hold: nothing goes on the calendar until Stripe says the plan is paid. The details wait in KV;
+  // the Stripe webhook turns them into the calendar event (and checks the time is still free).
+  const id = randomId();
+  await kvPut(env, "pending:" + id, { v, at: now }, PENDING_TTL);
+  const url = `${PAY_LINKS[v.plan]}?client_reference_id=${encodeURIComponent(id)}&prefilled_email=${encodeURIComponent(v.email)}`;
+  return { status: 200, body: { holdId: id, checkoutUrl: url } };
 }
 
 /* ---- Stripe webhook */
@@ -764,6 +747,9 @@ export async function handleWebhook(env, raw, sigHeader, now = Date.now()) {
   if (!id || !/^v[0-9a-f]{24}$/.test(id)) return { status: 200, body: { ignored: "not a scheduled plan" } };
   if (!["paid", "no_payment_required"].includes(s.payment_status)) return { status: 200, body: { ignored: "not paid yet" } };
 
+  const pending = await kvJson(env, "pending:" + id, null);
+  if (pending && pending.v) return confirmPending(env, id, pending.v, s, now);
+
   let e;
   try {
     e = await gcal(env, calPath(env, `/events/${encodeURIComponent(id)}`));
@@ -793,6 +779,74 @@ export async function handleWebhook(env, raw, sigHeader, now = Date.now()) {
     await sendMail(env, "New plan member",
       `${pr.name} (${pr.email}, ${pr.phone}) started the ${PLAN_KEYS[planKey]?.name} plan.\nFirst visit: ${fmt(firstMs)}\n${e.location || ""}\nVehicle: ${pr.vehicle}`);
   }
+  return { status: 200, body: { confirmed: id } };
+}
+
+/** True when the whole 12-week run of this plan still fits around everything on the calendar. */
+async function slotStillFree(env, planKey, t0, now) {
+  if (t0 < now) return false;
+  const weeks = PLAN_KEYS[planKey].weeks;
+  const busy = await freeBusy(env, t0 - DAY, t0 + (CHECK_DAYS + 2) * DAY);
+  return seriesTimes(t0, weeks, CHECK_DAYS).every((t) => !busy.some((b) => t < b.e && t + VISIT_MS + BUFFER_MS > b.s));
+}
+
+/** Payment arrived for a form submission that has no calendar hold: book it now, or tell the owner. */
+async function confirmPending(env, id, v, s, now) {
+  const planKey = v.plan;
+  const planName = PLAN_KEYS[planKey]?.name || "Plan";
+  if (await kvGet(env, "conf:" + id)) return { status: 200, body: { already: true } };
+
+  // the same payment can be delivered twice: if the event already exists there is nothing to do
+  try {
+    const existing = await gcal(env, calPath(env, `/events/${encodeURIComponent(id)}`));
+    if (existing && existing.status !== "cancelled") return { status: 200, body: { already: true } };
+  } catch (err) {
+    if (err.status !== 404 && err.status !== 410) throw err;
+  }
+
+  const takenMail = async (why) => {
+    await kvPut(env, "conf:" + id, "taken", 30 * 86400);
+    await sendMail(env, "Plan paid but the time was taken",
+      `${v.name} paid for the ${planName} plan (Stripe session ${s.id}, ${s.customer_details?.email || v.email}) but ${why}\n` +
+      `They wanted: ${fmt(v.start)}\nPhone: ${v.phone}\nEmail: ${v.email}\nAddress: ${v.address}\n` +
+      `Nothing was booked. Call or text them to pick another time, or refund the payment in Stripe.`);
+    return { status: 200, body: { warning: "time taken" } };
+  };
+
+  if (!(await slotStillFree(env, planKey, v.start, now))) return takenMail("that time is no longer free.");
+
+  const body = planEvent(planKey, v.start, v, now, false);
+  body.id = id;
+  body.extendedProperties.private = {
+    ...body.extendedProperties.private,
+    stripeCustomer: s.customer || "", stripeSub: s.subscription || "", paidAt: new Date(now).toISOString(),
+  };
+  const emp = String(env.EMPLOYEE_EMAILS || "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (emp.length) body.attendees = emp.map((email) => ({ email }));
+  const mine = await gcal(env, calPath(env, "/events"), { method: "POST", body, query: [["sendUpdates", "none"]] });
+
+  // two payments for the same slot in the same second: the earlier event keeps it
+  const others = await gcal(env, calPath(env, "/events"), {
+    query: [["singleEvents", "true"], ["timeMin", new Date(v.start - BUFFER_MS).toISOString()],
+      ["timeMax", new Date(v.start + VISIT_MS + BUFFER_MS).toISOString()], ["privateExtendedProperty", "vanyans=1"]],
+  });
+  const myCreated = Date.parse(mine.created || new Date(now).toISOString());
+  const lost = (others.items || []).some((o) => {
+    if (o.status === "cancelled" || String(o.id).startsWith(id)) return false;
+    const oc = Date.parse(o.created || 0);
+    return oc < myCreated || (oc === myCreated && String(o.id) < id);
+  });
+  if (lost) {
+    await gcalDelete(env, id);
+    return takenMail("someone else booked it at the same moment.");
+  }
+
+  await kvPut(env, "conf:" + id, "1", 30 * 86400);
+  if (env.STATE) await env.STATE.delete("pending:" + id);
+  await sendClientMail(env, v.email, "You're booked with Vanyan's Auto Detail",
+    confirmationText(planName, v.name, v.start, v.address, v.sms));
+  await sendMail(env, "New plan member",
+    `${v.name} (${v.email}, ${v.phone}) started the ${planName} plan.\nFirst visit: ${fmt(v.start)}\n${v.address || ""}\nVehicle: ${v.vehicle}`);
   return { status: 200, body: { confirmed: id } };
 }
 
