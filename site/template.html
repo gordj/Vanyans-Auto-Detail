@@ -3043,13 +3043,28 @@ footer .wrap{position:relative; display:block}
       var inp = $('rsv-address'), list = $('rsv-ac'); if (!inp || !list) return;
       var timer = null, seq = 0, items = [], active = -1;
       var ST = { California: 'CA' };
+      var ZIPCITY = {
+        '91352': 'Sun Valley', '91402': 'Panorama City', '91401': 'Van Nuys', '91405': 'Van Nuys', '91406': 'Van Nuys', '91411': 'Van Nuys',
+        '91601': 'North Hollywood', '91602': 'North Hollywood', '91605': 'North Hollywood', '91606': 'North Hollywood',
+        '91604': 'Studio City', '91607': 'Valley Village', '91403': 'Sherman Oaks', '91423': 'Sherman Oaks',
+        '91316': 'Encino', '91436': 'Encino', '91356': 'Tarzana', '91364': 'Woodland Hills', '91367': 'Woodland Hills',
+        '91344': 'Granada Hills', '91345': 'Mission Hills', '91331': 'Pacoima', '91342': 'Sylmar', '91340': 'San Fernando',
+        '91343': 'North Hills', '91324': 'Northridge', '91325': 'Northridge', '91326': 'Porter Ranch', '91311': 'Chatsworth',
+        '91306': 'Winnetka', '91335': 'Reseda', '91303': 'Canoga Park', '91304': 'Canoga Park', '91307': 'West Hills',
+        '91040': 'Sunland', '91042': 'Tujunga', '90039': 'Los Angeles', '90027': 'Los Angeles', '90068': 'Los Angeles',
+        '91105': 'Pasadena', '91106': 'Pasadena', '91107': 'Pasadena', '91103': 'Pasadena', '91104': 'Pasadena', '91101': 'Pasadena'
+      };
       function close() { list.hidden = true; list.innerHTML = ''; items = []; active = -1; inp.setAttribute('aria-expanded', 'false'); }
       function label(f, typed) {
         var p = f.properties || {}, street = p.street || p.name;
         if (!street) return null;
         var num = p.housenumber || '';
         if (!num) { var m = typed.match(/^\s*(\d+[A-Za-z]?)(?![A-Za-z0-9])/); if (m) num = m[1]; }
-        var city = p.city || p.locality || p.district || p.county || '';
+        var zip = String(p.postcode || '').slice(0, 5);
+        var hood = [p.locality, p.district].filter(function (x) { return x && !/council|district/i.test(x); })[0] || '';
+        var city = p.city || hood || p.county || '';
+        /* The map data calls most of the San Fernando Valley "Los Angeles"; the mailing city is what people expect. */
+        if (!p.city || p.city === 'Los Angeles') city = ZIPCITY[zip] || hood || city;
         var st = ST[p.state] || p.state || '';
         var line1 = (num ? num + ' ' : '') + street;
         var tail = [city, (st + ' ' + (p.postcode || '')).trim()].filter(Boolean).join(', ');
