@@ -526,7 +526,8 @@ const OFFER_DAYS = 21;               // first visits offered: the next 3 weeks
 const CHECK_DAYS = 84;               // a slot must stay free 12 weeks ahead (covers every 1/2/4-week overlap)
 const HOLD_MS = 30 * 60e3;
 const PENDING_TTL = 14 * 86400;       // a form submission waits this long for its Stripe payment (seconds)
-const MAX_HOLDS = 10;                // stops someone filling the calendar with unpaid holds
+const MAX_HOLDS = 10;                // (old calendar holds: still cleaned up by the cron)
+const MAX_SUBMITS_PER_HOUR = 15;     // booking-form submissions accepted per hour: stops spam from using up storage
 const RECHECK_MS = 55 * 60e3;        // how often each member's Stripe plan is re-checked
 const ALLOWED_ORIGINS = new Set([
   "https://vanyansautodetail.com", "https://www.vanyansautodetail.com", "http://localhost:8080",
@@ -708,6 +709,11 @@ export async function createHold(env, input, now = Date.now()) {
   if (!env.STATE) return { status: 503, body: { error: "Booking is temporarily unavailable. Call or text " + PHONE + "." } };
   const free = await freeStarts(env, v.plan, now);
   if (!free.includes(v.start)) return { status: 409, body: { error: "That time was just taken. Please pick another." } };
+
+  const hourKey = "rl:" + Math.floor(now / 3600e3);
+  const sent = Number((await kvGet(env, hourKey)) || 0);
+  if (sent >= MAX_SUBMITS_PER_HOUR) return { status: 429, body: { error: "Lots of people are booking right now. Try again in a few minutes, or call or text " + PHONE + "." } };
+  await kvPut(env, hourKey, String(sent + 1), 7200);
 
   // No hold: nothing goes on the calendar until Stripe says the plan is paid. The details wait in KV;
   // the Stripe webhook turns them into the calendar event (and checks the time is still free).
