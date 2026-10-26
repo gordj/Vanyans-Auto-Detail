@@ -73,7 +73,12 @@ export default {
       const g = env.STATE ? await env.STATE.get("last-google") : null;
       const body = last ? JSON.parse(last) : { note: "not run yet" };
       if (g) body.google = JSON.parse(g);
-      return new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+      // The full report names clients and their visit times, so it is private: /health?key=<HEALTH_KEY secret>.
+      // Anyone else only learns whether the last run worked.
+      const key = url.searchParams.get("key") || "";
+      const full = !!env.HEALTH_KEY && key.length === env.HEALTH_KEY.length && timingSafeEqual(key, env.HEALTH_KEY);
+      const out = full ? body : { ok: !body.error && !(body.google && body.google.error), at: body.at || null };
+      return new Response(JSON.stringify(out), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
     }
     if (url.pathname.startsWith("/api/")) return handleApi(request, env, url);
     return new Response("Not found", { status: 404 });

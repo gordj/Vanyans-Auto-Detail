@@ -47,4 +47,5 @@ Never paste these into chat or commit them to git. Deploy again if Cloudflare as
 3. Book a visit for yourself at least ~25 hours ahead with the box ticked. The hourly run texts you inside the
    24-hour window. Replying STOP is handled by Twilio and the Worker skips that client from then on.
 
-Texts are logged in https://vanyans-plans.gordjalayan.workers.dev/health but never emailed to the owner.
+Texts are logged in the private status report at `https://vanyans-plans.gordjalayan.workers.dev/health?key=YOUR_HEALTH_KEY`
+(set a `HEALTH_KEY` secret first; without it /health only says whether the last run worked). They are never emailed to the owner.
