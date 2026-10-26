@@ -3,3 +3,11 @@ Thumbs.db
 desktop.ini
 *.zip
 .claude/settings.local.json
+
+# never publish: secrets, client data, paperwork (this repo is public)
+API Keys/
+Client List.xlsx
+Invoice-*.pdf
+Receipt-*.pdf
+*.env
+.env*
